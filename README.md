@@ -49,47 +49,48 @@ git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
 
 ## 使用
 
-1. 把 `scripts/usage-report.py` 放到本地（Python 3.8+，仅标准库）
-2. 运行 `python scripts/usage-report.py --today` 查看今日报告
-3. 数据目录默认自动检测（Windows 小遥Claw：`C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`）；可用 `--state <路径>` 或环境变量 `OPENCLAW_STATE` 覆盖
-4. 可选：挂 Cron 生成每日 token 日报
+1. 安装技能（ClawHub 或手动放入 skills 目录）
+2. 直接对 agent 说「**跑今日用量报告**」，agent 会自动：
+   - 定位 usage-report 技能 → 检测 OpenClaw state 目录
+   - 解析全部 agent 的 session JSONL → 输出任务耗时 / 模型 token / 工具耗时 / 技能使用 / 每日趋势
+3. 继续对话追问：最慢工具、按 agent 对账、近 7 天趋势、技能盘点
+4. 可选：说「配置每天 22:00 自动推送用量报告」开启定时日报
+
+### 命令行参考（可选）
+
+不想通过对话、想直接跑脚本时：
+
+```bash
+python scripts/usage-report.py --today    # 今日（默认全维度）
+python scripts/usage-report.py --week     # 近 7 天
+python scripts/usage-report.py --all      # 全部
+python scripts/usage-report.py --agent xiaoxia   # 按 agent 过滤
+python scripts/usage-report.py --by-tool  # 仅工具耗时
+python scripts/usage-report.py --skills   # 仅技能使用
+python scripts/usage-report.py --today --json > usage-report.json   # JSON 输出
+```
+
+数据目录默认自动检测（Windows 小遥Claw：`C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`）；覆盖用 `--state <路径>` 或环境变量 `OPENCLAW_STATE`。
 
 ## 🚀 快速上手（三步，5 分钟）
 
-### Step 1：下载脚本
+### Step 1：安装技能
 
 ```bash
-git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
-cd xiaoyaoclaw-usage-report
+clawhub install xiaoyaoclaw-usage-report
 ```
 
-### Step 2：跑第一份报告
+### Step 2：一句话触发第一份报告
 
-```bash
-python scripts/usage-report.py --today
-```
+对你的 agent 说：
 
-自动完成：检测 state 目录 → 解析全部 agent 的 session JSONL → 输出任务耗时 / 模型 token / 工具耗时 / 技能使用 / 每日趋势总览。
+> 跑今日用量报告
 
-### Step 3：进阶查询
+agent 自动完成：定位 usage-report 技能 → 检测 state 目录 → 解析全部 session JSONL → 输出任务耗时 / 模型 token / 工具耗时 / 技能使用 / 每日趋势总览。
 
-```bash
-# 近 7 天 / 全部历史
-python scripts/usage-report.py --week
-python scripts/usage-report.py --all
+### Step 3：验收 + 对话式进阶查询
 
-# 按 agent 过滤
-python scripts/usage-report.py --agent xiaoxia
-
-# 仅工具耗时明细 / 仅技能
-python scripts/usage-report.py --by-tool
-python scripts/usage-report.py --skills
-
-# JSON 输出（可管道给其他工具 / 用于 cron 日报）
-python scripts/usage-report.py --today --json > usage-report.json
-```
-
-示例输出：
+打开报告看这几个关键块：
 
 ```
 📊 总览: 7 个任务 | 总 token(input+output): 1,747,066 | 总耗时: 230.0m
@@ -103,15 +104,24 @@ python scripts/usage-report.py --today --json > usage-report.json
   exec        204    1    54.5m  16.0s  6.2m
 ```
 
+不用记任何命令，直接对话追问：
+
+> 哪个工具最慢？哪个 agent 用 token 最多？近 7 天每天消耗多少？
+
+想每天自动收到日报，对 agent 说：
+
+> 配置每天 22:00 自动推送用量报告
+
 ### 日常使用习惯
 
-| 场景 | 动作 |
+| 场景 | 对 agent 说 |
 |---|---|
-| 每日对账 | 说「跑今日用量报告」，或挂 cron 每日 22:00 自动推送 |
-| 定位瓶颈 | `--by-tool` 看最慢工具，优先优化 |
-| 技能盘点 | `--skills` 看哪些 skill 在用、哪些闲置 |
-| 发布前评估 | `--week` 看近 7 天消耗趋势 |
-| 上下文快满 | `--today --json` 导出存档，再 /reset |
+| 每日对账 | 「跑今日用量报告」，或挂 cron 每日 22:00 自动推送 |
+| 定位瓶颈 | 「哪个工具最慢」→ 优先优化它 |
+| 技能盘点 | 「哪些技能用得多、哪些闲置」 |
+| 按 agent 对账 | 「xiaoxia 今天花了多少 token」 |
+| 发布前评估 | 「跑近 7 天用量报告」看消耗趋势 |
+| 自动化 | 「配置每天 22:00 自动推送用量报告」 |
 
 ## 统计口径（重要）
 

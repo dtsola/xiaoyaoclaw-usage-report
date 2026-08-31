@@ -47,47 +47,48 @@ git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
 
 ## Usage
 
-1. Put `scripts/usage-report.py` on your machine (Python 3.8+, standard library only)
-2. Run `python scripts/usage-report.py --today` for today's report
-3. Data directory is auto-detected (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`); override with `--state <path>` or the `OPENCLAW_STATE` env var
-4. Optional: schedule a Cron job for a daily token report
+1. Install the skill (from ClawHub, or drop it into your skills directory manually)
+2. Just tell your agent "**run today's usage report**" — it will automatically:
+   - Locate the usage-report skill → detect the OpenClaw state directory
+   - Parse all agents' session JSONL → output task duration / model tokens / tool latency / skill usage / daily trend
+3. Keep asking conversationally: slowest tool, per-agent accounting, 7-day trend, skill inventory
+4. Optional: say "schedule a usage report push at 22:00 daily" for an automatic daily report
+
+### CLI reference (optional)
+
+Prefer running the script directly instead of chatting:
+
+```bash
+python scripts/usage-report.py --today    # today (all dimensions by default)
+python scripts/usage-report.py --week     # last 7 days
+python scripts/usage-report.py --all      # all history
+python scripts/usage-report.py --agent xiaoxia   # filter by agent
+python scripts/usage-report.py --by-tool  # tool latency only
+python scripts/usage-report.py --skills   # skills only
+python scripts/usage-report.py --today --json > usage-report.json   # JSON output
+```
+
+The data directory is auto-detected (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`); override with `--state <path>` or the `OPENCLAW_STATE` env var.
 
 ## 🚀 Quick Start (3 steps, 5 minutes)
 
-### Step 1: Download the script
+### Step 1: Install the skill
 
 ```bash
-git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
-cd xiaoyaoclaw-usage-report
+clawhub install xiaoyaoclaw-usage-report
 ```
 
-### Step 2: Run your first report
+### Step 2: Trigger your first report with one sentence
 
-```bash
-python scripts/usage-report.py --today
-```
+Tell your agent:
 
-It automatically: detects the state directory → parses all agents' session JSONL → outputs task duration / model tokens / tool latency / skill usage / daily trend overview.
+> Run today's usage report
 
-### Step 3: Advanced queries
+The agent automatically: locates the usage-report skill → detects the state directory → parses all session JSONL → outputs task duration / model tokens / tool latency / skill usage / daily trend overview.
 
-```bash
-# Last 7 days / all history
-python scripts/usage-report.py --week
-python scripts/usage-report.py --all
+### Step 3: Verify + conversational follow-ups
 
-# Filter by agent
-python scripts/usage-report.py --agent xiaoxia
-
-# Tool latency only / skills only
-python scripts/usage-report.py --by-tool
-python scripts/usage-report.py --skills
-
-# JSON output (pipe to other tools / cron daily report)
-python scripts/usage-report.py --today --json > usage-report.json
-```
-
-Sample output:
+Check these key blocks in the report:
 
 ```
 📊 总览: 7 个任务 | 总 token(input+output): 1,747,066 | 总耗时: 230.0m
@@ -101,15 +102,24 @@ Sample output:
   exec        204    1    54.5m  16.0s  6.2m
 ```
 
+No need to memorize any commands — just ask:
+
+> Which tool is the slowest? Which agent consumed the most tokens? What's the daily trend over the last 7 days?
+
+Want a daily report pushed automatically? Tell your agent:
+
+> Schedule a usage report push at 22:00 daily
+
 ### Daily habits
 
-| Scenario | Action |
+| Scenario | Tell your agent |
 |---|---|
-| Daily reconciliation | Say "run today's usage report", or schedule a 22:00 Cron push |
-| Find bottlenecks | `--by-tool` to spot the slowest tool, optimize it first |
-| Skill inventory | `--skills` to see which skills are in use vs idle |
-| Pre-release review | `--week` for the 7-day consumption trend |
-| Context nearly full | `--today --json` to export & archive, then /reset |
+| Daily reconciliation | "Run today's usage report", or schedule a 22:00 Cron push |
+| Find bottlenecks | "Which tool is the slowest" → optimize it first |
+| Skill inventory | "Which skills are used a lot, which are idle" |
+| Per-agent accounting | "How many tokens did xiaoxia use today" |
+| Pre-release review | "Run the last 7 days usage report" for the trend |
+| Automation | "Schedule a usage report push at 22:00 daily" |
 
 ## Statistics rules (important)
 
