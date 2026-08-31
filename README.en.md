@@ -1,45 +1,79 @@
-<div align="center">
+# OpenClaw Usage Report 📊
 
-<img src="assets/readme/hero.svg" alt="OpenClaw Usage Report" width="100%" />
+> Usage & performance reporting for OpenClaw — how long each task took, which tools/skills/models were used, how many tokens were consumed.
 
-# OpenClaw Usage Report
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="OpenClaw Usage Report — parse session JSONL for task duration, tool/skill/model usage and token consumption, zero-dependency & local-only">
+</p>
 
-**Usage & performance reporting for OpenClaw agents** — how long each task took, which tools/skills/models were used, and how many tokens were consumed.
+> Answer "how long did each agent task take, which tools/skills/models were used, how many tokens were consumed".
+> OpenClaw usage & performance reporting — parse session JSONL locally, zero dependency, data never leaves your machine.
 
-Zero dependency · Local only · Data never leaves your machine
+![license](https://img.shields.io/badge/license-MIT-green)
+[![ClawHub downloads](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fclawhub.ai%2Fapi%2Fv1%2Fskills%2Fxiaoyaoclaw-usage-report&query=skill.stats.downloads&label=ClawHub%20downloads&color=blue)](https://clawhub.ai/dtsola/skills/xiaoyaoclaw-usage-report)
 
-</div>
+## Why you need it
 
----
+OpenClaw has no built-in per-task performance panel. Trying to optimize your agents, you:
+- ❌ **Don't know how long each task took** — no timing stats, just gut feeling
+- ❌ **Can't find the slowest tool** — is exec / web_fetch / process the bottleneck? No data
+- ❌ **Can't reconcile token usage** — how many tokens per agent/model? All blurry
+- ❌ **No trace of skill usage** — which skills were used, how many times? Nobody knows
 
-## Why
-
-OpenClaw has no built-in per-task performance panel, but session JSONL files (`state/agents/*/sessions/*.jsonl`) already record timestamps and token usage for every task, tool call, and model call. This tool consumes that data directly — **no extra instrumentation, no external dependencies, no uploads**.
-
-Use it for: usage baselines before optimizing, finding the slowest tools, per-agent token reconciliation, and skill usage inventory.
+But the data has always been there — local session JSONL files (`state/agents/*/sessions/*.jsonl`) already record timestamps and token usage for every task, tool call, and model call. This tool consumes that data directly: **zero dependency · local only · data never leaves your machine**.
 
 ## Features
 
-| Dimension | Description |
-|-----------|-------------|
-| Task duration | Wall-clock + active duration per task (excludes user thinking gaps) |
-| Model tokens | Per agent/model: call count, input/output tokens (real usage = input+output) |
-| Model latency | Estimated (event-ts gap), total & average per agent/model |
-| Tool latency | Per tool: count, errors, total/avg/max duration — find bottlenecks |
-| Skill usage | Inferred from `read` calls: skill name, load count, agents |
-| Daily trend | Daily input/output tokens and call counts |
-| MCP tools | Same structure as regular tools (toolCall/toolResult) — covered natively |
+- ⏱️ **Task duration** — wall-clock + active duration per task (excludes user thinking gaps)
+- 🔢 **Model tokens** — per agent/model: call count, input/output tokens (real usage = input+output)
+- 🧮 **Model latency** — estimated (event-ts gap, capped at 10 min), total & average per agent/model
+- 🔧 **Tool latency** — per tool: count, errors, total/avg/max duration — find bottlenecks at a glance
+- 🧩 **Skill usage** — inferred from `read` calls: skill name, load count, agents
+- 📈 **Daily trend** — daily input/output tokens and call counts
+- 🤖 **MCP tools** — same structure as regular tools (toolCall/toolResult), covered natively
+- 🔒 **Zero-dependency, local-only** — pure Python standard library, no uploads
+- ⏰ **Optional Cron daily report** — `--today --json` for scheduled reports; enable it yourself
 
-## Quick Start
+## Install
 
 ```bash
-# Today's report (all dimensions by default)
+# From ClawHub (recommended)
+clawhub install xiaoyaoclaw-usage-report
+
+# Or manually from GitHub
+git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
+# Put scripts/usage-report.py into your scripts directory
+```
+
+## Usage
+
+1. Put `scripts/usage-report.py` on your machine (Python 3.8+, standard library only)
+2. Run `python scripts/usage-report.py --today` for today's report
+3. Data directory is auto-detected (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`); override with `--state <path>` or the `OPENCLAW_STATE` env var
+4. Optional: schedule a Cron job for a daily token report
+
+## 🚀 Quick Start (3 steps, 5 minutes)
+
+### Step 1: Download the script
+
+```bash
+git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
+cd xiaoyaoclaw-usage-report
+```
+
+### Step 2: Run your first report
+
+```bash
 python scripts/usage-report.py --today
+```
 
-# Last 7 days
+It automatically: detects the state directory → parses all agents' session JSONL → outputs task duration / model tokens / tool latency / skill usage / daily trend overview.
+
+### Step 3: Advanced queries
+
+```bash
+# Last 7 days / all history
 python scripts/usage-report.py --week
-
-# All history
 python scripts/usage-report.py --all
 
 # Filter by agent
@@ -53,9 +87,31 @@ python scripts/usage-report.py --skills
 python scripts/usage-report.py --today --json > usage-report.json
 ```
 
-The data directory is auto-detected (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`); override with `--state <path>` or the `OPENCLAW_STATE` env var.
+Sample output:
 
-## Statistics Rules (important)
+```
+📊 总览: 7 个任务 | 总 token(input+output): 1,747,066 | 总耗时: 230.0m
+
+📦 按 agent / 模型（token=input+output 真实消耗；模型耗时≈事件ts间隔，cap 10min）
+  Agent     模型                      调用    输入tok    输出tok   模型总耗时  平均
+  tiantong  deepseek/deepseek-v4-flash  146  1,513,943  150,870      28.3m  11.6s
+
+🔧 按工具（耗时 = toolResult - toolCall）
+  工具        次数  失败   总耗时   平均   最慢
+  exec        204    1    54.5m  16.0s  6.2m
+```
+
+### Daily habits
+
+| Scenario | Action |
+|---|---|
+| Daily reconciliation | Say "run today's usage report", or schedule a 22:00 Cron push |
+| Find bottlenecks | `--by-tool` to spot the slowest tool, optimize it first |
+| Skill inventory | `--skills` to see which skills are in use vs idle |
+| Pre-release review | `--week` for the 7-day consumption trend |
+| Context nearly full | `--today --json` to export & archive, then /reset |
+
+## Statistics rules (important)
 
 1. **Real token usage = input + output**. `totalTokens` includes cacheRead (re-counted every turn; measured inflation 1.3x–14x+, up to 568x per message) — the script already avoids this.
 2. **Tool duration = toolResult.ts − assistant(toolCall).ts**, includes the model's tool-call decision time (not pure execution time).
@@ -63,7 +119,7 @@ The data directory is auto-detected (Windows XiaoyaoClaw: `C:\Users\<user>\AppDa
 4. **No cost dimension**: pricing differs per provider; tokens are the universal metric. To add costs, configure `models.providers.*.cost` in OpenClaw and extend.
 5. **Skill stats** cover only skills actually loaded via `read` (metadata-injected but never loaded ones are not counted).
 
-## Cron Daily Report (optional, user-configured)
+## Cron daily report (optional, user-configured)
 
 The tool supports `--today --json` output for scheduled daily token reports. Whether to enable it and when to push is entirely up to the user.
 
@@ -84,27 +140,63 @@ OpenClaw cron example:
 
 Or use Windows Task Scheduler / Linux crontab to run the script directly.
 
-## Limitations
+## How it compares
 
-- "Active duration" is approximate (gaps <5 min accumulated; may include heartbeats)
-- Only JSONL version 3 sessions are supported
-- Local data only (run per machine in multi-host setups)
+| | claw-lens (local dashboard) | **xiaoyaoclaw-usage-report** |
+|---|---|---|
+| Form | Node web dashboard, needs a running service | ✅ Zero-dependency Python CLI, single file |
+| Install cost | npm install + always-on service | ✅ Copy & run |
+| Data source | Same session JSONL | ✅ Same session JSONL |
+| Model latency | Not provided | ✅ Estimated (event-ts gap) |
+| Token accounting | Not distinguished | ✅ Real usage input+output, avoids cacheRead inflation |
+| Output | Web visualizations | ✅ Terminal tables + JSON pipeline (cron/CI friendly) |
+| Data safety | Local | ✅ Local, zero upload |
 
-## Requirements
+## Directory structure
 
-- Python 3.8+ (standard library only, zero dependencies)
-- Read access to the OpenClaw state directory (`state/agents/*/sessions/*.jsonl`)
-
-## Sister Projects
-
-- [xiaoyaoclaw-workspace-initializer](https://github.com/dtsola/xiaoyaoclaw-workspace-initializer)
-- [xiaoyaoclaw-memory-distill](https://github.com/dtsola/xiaoyaoclaw-memory-distill)
-- [xiaoyaoclaw-task-progress-tracker](https://github.com/dtsola/xiaoyaoclaw-task-progress-tracker)
-- [xiaoyaoclaw-kb-retriever](https://github.com/dtsola/xiaoyaoclaw-kb-retriever)
-- [xiaoyaoclaw-workspace-auditor](https://github.com/dtsola/xiaoyaoclaw-workspace-auditor)
-- [xiaoyaoclaw-web-clipper](https://github.com/dtsola/xiaoyaoclaw-web-clipper)
-- [xiaoyaoclaw-agent-orchestrator](https://github.com/dtsola/xiaoyaoclaw-agent-orchestrator)
+```
+xiaoyaoclaw-usage-report/
+├── SKILL.md                    # the skill itself (usage + triggers)
+├── scripts/
+│   └── usage-report.py         # main script (zero-dependency stdlib)
+├── docs/
+│   └── DESIGN.md               # design document
+├── assets/readme/
+│   ├── hero.svg                # README hero
+│   └── community-qr.png        # community QR code
+├── README.md
+└── LICENSE
+```
 
 ## License
 
-MIT © dtsola
+MIT — use it freely, attribution optional.
+
+---
+
+## 🛠️ Need customization?
+
+**Agent & Skills customization, from ¥800 (≈$110).**
+
+- WeChat: `dtsola` (note: **openclaw custom**)
+- Services: OpenClaw multi-agent deployment / workspace standardization / custom Skill development / usage monitoring & optimization
+
+## 💬 Join the community
+
+Xiaoyao product family user group — feedback · exchange · suggestions:
+
+<p align="center">
+  <img src="./assets/readme/community-qr.png" width="280" alt="XiaoyaoAI user group QR: scan to join, or add WeChat dtsola (note: 加群)">
+</p>
+
+<p align="center">Scan to join, or add WeChat <code>dtsola</code> (note: <b>加群</b>)</p>
+
+## Sister projects
+
+- 🏠 **xiaoyaoclaw-workspace-initializer** (workspace initializer): gives every agent a "home" — standard directory structure + WORKSPACE.md rules + multi-agent config safety. <https://github.com/dtsola/xiaoyaoclaw-workspace-initializer>
+- 🧠 **xiaoyaoclaw-memory-distill** (memory distillation): turn conversations into structured memory — semantic classification + first-run build + incremental dedup + sensitive-info skip. <https://github.com/dtsola/xiaoyaoclaw-memory-distill>
+- 🗂️ **xiaoyaoclaw-task-progress-tracker** (task progress tracker): directory as container, PROGRESS.md as progress — lifecycle management for tasks/ and projects/. <https://github.com/dtsola/xiaoyaoclaw-task-progress-tracker>
+- 📚 **xiaoyaoclaw-kb-retriever** (knowledge base retriever): local KB retrieval — hierarchical data_structure.md index + progressive retrieval over md/pdf/xlsx, zero-dependency, Windows & macOS. <https://github.com/dtsola/xiaoyaoclaw-kb-retriever>
+- 🩹 **xiaoyaoclaw-workspace-auditor**: read-only workspace health check — 5 categories, graded report with fix suggestions, zero-dependency, never modifies files. <https://github.com/dtsola/xiaoyaoclaw-workspace-auditor>
+- 📎 **xiaoyaoclaw-web-clipper**: save any web page as clean local Markdown with frontmatter — dual-engine extraction (readability + trafilatura fallback), Chinese-safe filenames, batch clipping with dedup; feeds knowledge/clippings/ for kb-retriever. <https://github.com/dtsola/xiaoyaoclaw-web-clipper>
+- 🤝 **xiaoyaoclaw-agent-orchestrator** (agent orchestrator): split tasks, dispatch to agents, track progress, aggregate results, retry on failure — daily multi-agent coordination. <https://github.com/dtsola/xiaoyaoclaw-agent-orchestrator>
