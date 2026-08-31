@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/readme/hero.svg" alt="OpenClaw Usage Report" width="100%" />
+
 # OpenClaw Usage Report
 
 **Usage & performance reporting for OpenClaw agents** — how long each task took, which tools/skills/models were used, and how many tokens were consumed.

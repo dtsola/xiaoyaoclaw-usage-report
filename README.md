@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/readme/hero.svg" alt="OpenClaw Usage Report" width="100%" />
+
 # OpenClaw Usage Report · 用量报告
 
 **OpenClaw 用量与性能查询工具** — 回答「每次 agent 任务花了多久、用了哪些工具/技能/模型、消耗了多少 token」
