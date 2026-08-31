@@ -113,7 +113,7 @@ def analyze(state_dir):
                                                       "cost": 0.0, "calls": 0,
                                                       "total_ms": 0, "max_ms": 0}))
     tools = defaultdict(lambda: {"count": 0, "errors": 0, "total_ms": 0,
-                                 "max_ms": 0, "min_ms": None})
+                                 "max_ms": 0, "min_ms": None, "agents": set()})
     skills = defaultdict(lambda: {"count": 0, "agents": set()})
     sessions = []  # (agent, session_id, start, end, models, tokens, cost, tools, msgs)
     daily = defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0, "cost": 0.0, "calls": 0})
@@ -229,11 +229,13 @@ def analyze(state_dir):
                         tools[pname]["total_ms"] += dur
                         tools[pname]["max_ms"] = max(tools[pname]["max_ms"], dur)
                         tools[pname]["min_ms"] = dur if tools[pname]["min_ms"] is None else min(tools[pname]["min_ms"], dur)
+                        tools[pname]["agents"].add(agent)
                         if is_err:
                             tools[pname]["errors"] += 1
                     else:
                         # 无配对（如截断）也计数
                         tools[tname]["count"] += 1
+                        tools[tname]["agents"].add(agent)
                         if is_err:
                             tools[tname]["errors"] += 1
 
@@ -287,6 +289,20 @@ def fmt_ms(ms):
     if ms < 60000:
         return f"{ms/1000:.1f}s"
     return f"{ms/60000:.1f}m"
+
+
+def apply_agent_filter(r, agent_name):
+    """按 agent 过滤所有维度（agents/tools/skills/sessions/daily）。
+    必须在窗口过滤之后、输出之前调用，保证 --agent 对每个维度都生效。"""
+    if not agent_name:
+        return r
+    r = dict(r)
+    r["agents"] = {a: mm for a, mm in r["agents"].items() if a == agent_name}
+    r["tools"] = {t: d for t, d in r["tools"].items() if agent_name in d["agents"]}
+    r["skills"] = {s: d for s, d in r["skills"].items() if agent_name in d["agents"]}
+    r["sessions"] = [s for s in r["sessions"] if s["agent"] == agent_name]
+    r["daily"] = dict(r["daily"])  # daily 无 agent 维度，保留原样
+    return r
 
 
 def report(r, args):
@@ -391,6 +407,9 @@ def main():
     r = analyze(args.state)
     if r is None:
         sys.exit(1)
+
+    # 统一按 agent 过滤（对所有维度生效，report 与 JSON 共用）
+    r = apply_agent_filter(r, args.agent)
 
     if args.json:
         # 简化 JSON：只输出核心聚合
