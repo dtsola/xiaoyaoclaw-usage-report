@@ -116,7 +116,9 @@ def analyze(state_dir):
                                  "max_ms": 0, "min_ms": None, "agents": set()})
     skills = defaultdict(lambda: {"count": 0, "agents": set()})
     sessions = []  # (agent, session_id, start, end, models, tokens, cost, tools, msgs)
-    daily = defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0, "cost": 0.0, "calls": 0})
+    daily = defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0, "cost": 0.0, "calls": 0,
+                                 "agents": defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0,
+                                                                "cost": 0.0, "calls": 0})})
 
     files = find_session_files(state_dir)
     if not files:
@@ -208,6 +210,10 @@ def analyze(state_dir):
                         daily[daily_key]["tokens_out"] += tout
                         daily[daily_key]["cost"] += cost
                         daily[daily_key]["calls"] += 1
+                        daily[daily_key]["agents"][agent]["tokens_in"] += tin
+                        daily[daily_key]["agents"][agent]["tokens_out"] += tout
+                        daily[daily_key]["agents"][agent]["cost"] += cost
+                        daily[daily_key]["agents"][agent]["calls"] += 1
 
                     # 工具调用发起
                     for tc in extract_tool_calls(msg):
@@ -293,7 +299,7 @@ def fmt_ms(ms):
 
 def apply_agent_filter(r, agent_name):
     """按 agent 过滤所有维度（agents/tools/skills/sessions/daily）。
-    必须在窗口过滤之后、输出之前调用，保证 --agent 对每个维度都生效。"""
+    必须在窗口过滤之前、输出之前调用，保证 --agent 对每个维度都生效。"""
     if not agent_name:
         return r
     r = dict(r)
@@ -301,32 +307,40 @@ def apply_agent_filter(r, agent_name):
     r["tools"] = {t: d for t, d in r["tools"].items() if agent_name in d["agents"]}
     r["skills"] = {s: d for s, d in r["skills"].items() if agent_name in d["agents"]}
     r["sessions"] = [s for s in r["sessions"] if s["agent"] == agent_name]
-    r["daily"] = dict(r["daily"])  # daily 无 agent 维度，保留原样
+    # daily：只保留该 agent 的每日数据（无数据的天剔除）
+    r["daily"] = {k: v for k, v in r["daily"].items() if agent_name in v["agents"]}
+    for v in r["daily"].values():
+        v["tokens_in"] = v["agents"][agent_name]["tokens_in"]
+        v["tokens_out"] = v["agents"][agent_name]["tokens_out"]
+        v["cost"] = v["agents"][agent_name]["cost"]
+        v["calls"] = v["agents"][agent_name]["calls"]
+        v["agents"] = {agent_name: v["agents"][agent_name]}
     return r
+
+
+def in_window(ts, args, now=None):
+    """按 --today / --week 窗口过滤时间戳（模块级，report 与 JSON 共用）"""
+    if not ts:
+        return False
+    now = now or datetime.now(timezone.utc)
+    dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+    if args.today:
+        return dt.date() == now.date()
+    if args.week:
+        return dt >= now - timedelta(days=7)
+    return True
 
 
 def report(r, args):
     out = []
     now = datetime.now(timezone.utc)
 
-    def in_window(ts):
-        if not ts:
-            return False
-        dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
-        if args.today:
-            return dt.date() == now.date()
-        if args.week:
-            return dt >= now - timedelta(days=7)
-        return True
-
     # 过滤 sessions
-    sess = [s for s in r["sessions"] if in_window(s["start"])]
-    if args.agent:
-        sess = [s for s in sess if s["agent"] == args.agent]
+    sess = [s for s in r["sessions"] if in_window(s["start"], args, now)]
 
     # 过滤 daily（按窗口）
     daily = {k: v for k, v in r["daily"].items()
-             if in_window(datetime.strptime(k, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)}
+             if in_window(datetime.strptime(k, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000, args, now)}
 
     out.append("=" * 60)
     out.append("OpenClaw 用量报告")
@@ -412,13 +426,14 @@ def main():
     r = apply_agent_filter(r, args.agent)
 
     if args.json:
-        # 简化 JSON：只输出核心聚合
+        # 简化 JSON：只输出核心聚合（按窗口过滤 daily，与文本输出一致）
         slim = {
             "agents": {a: {m: d for m, d in mm.items()} for a, mm in r["agents"].items()},
-            "tools": r["tools"],
+            "tools": {t: {**d, "agents": sorted(d["agents"])} for t, d in r["tools"].items()},
             "skills": {k: {"count": v["count"], "agents": sorted(v["agents"])} for k, v in r["skills"].items()},
-            "sessions": r["sessions"],
-            "daily": r["daily"],
+            "sessions": [s for s in r["sessions"] if in_window(s["start"], args)],
+            "daily": {k: v for k, v in r["daily"].items()
+                      if in_window(datetime.strptime(k, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000, args)},
         }
         print(json.dumps(slim, ensure_ascii=False, indent=1))
     else:
