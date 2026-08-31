@@ -137,6 +137,7 @@ def analyze(state_dir):
         s_models = set()
         s_tokens = {"in": 0, "out": 0}
         s_cost = 0.0
+        s_model_ms = 0
         s_tools = set()
         s_msgs = 0
         # 活跃耗时：相邻事件间隔 < 5min 的累计（排除用户思考间隔）
@@ -201,6 +202,7 @@ def analyze(state_dir):
                             if 0 < llm_dur < 600000:
                                 agents[agent][mkey]["total_ms"] += llm_dur
                                 agents[agent][mkey]["max_ms"] = max(agents[agent][mkey]["max_ms"], llm_dur)
+                                s_model_ms += llm_dur
                         s_tokens["in"] += tin
                         s_tokens["out"] += tout
                         s_cost += cost
@@ -271,6 +273,7 @@ def analyze(state_dir):
                 "end": s_end,
                 "duration_ms": (s_end - s_start) if (s_start and s_end) else 0,
                 "active_ms": active_ms,
+                "model_ms": s_model_ms,
                 "models": sorted(s_models),
                 "tokens": s_tokens["in"] + s_tokens["out"],
                 "cost": s_cost,
@@ -387,11 +390,12 @@ def report(r, args):
 
     # 5. 任务排行（按耗时）
     if args.by_session:
-        out.append("\n⏱️ 任务排行（按活跃耗时；活跃=相邻事件间隔<5min 累计，排除用户思考）:")
-        out.append(f"  {'Agent':<10}{'活跃耗时':>10}{'窗口耗时':>10}{'token':>12}{'消息':>6}  模型")
-        for s in sorted(sess, key=lambda x: -x["active_ms"])[:20]:
+        out.append("\n⏱️ 任务排行（活跃=相邻事件间隔<5min 累计，排除用户思考；模型耗时=事件ts间隔近似，cap 10min）:")
+        out.append(f"  {'Agent':<10}{'活跃耗时':>10}{'窗口耗时':>10}{'模型耗时':>10}{'token':>12}{'消息':>6}  模型")
+        key = (lambda x: -x["model_ms"]) if args.by_model_time else (lambda x: -x["active_ms"])
+        for s in sorted(sess, key=key)[:20]:
             out.append(f"  {s['agent']:<10}{fmt_ms(s['active_ms']):>10}{fmt_ms(s['duration_ms']):>10}"
-                       f"{s['tokens']:>12,}{s['msgs']:>6}  {','.join(s['models'])[:60]}")
+                       f"{fmt_ms(s['model_ms']):>10}{s['tokens']:>12,}{s['msgs']:>6}  {','.join(s['models'])[:60]}")
 
     # 6. 每日趋势
     if args.daily:
@@ -414,6 +418,7 @@ def main():
     ap.add_argument("--by-tool", action="store_true", help="工具耗时明细")
     ap.add_argument("--skills", action="store_true", help="skills 使用统计")
     ap.add_argument("--by-session", action="store_true", help="任务耗时排行")
+    ap.add_argument("--by-model-time", action="store_true", help="任务排行按模型耗时排序")
     ap.add_argument("--daily", action="store_true", help="每日趋势")
     ap.add_argument("--json", action="store_true", help="JSON 输出")
     args = ap.parse_args()
