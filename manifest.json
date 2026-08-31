@@ -1,6 +1,6 @@
 {
   "name": "xiaoyaoclaw-usage-report",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "category": "Usage Analytics / Performance",
   "description": "OpenClaw usage & performance reporting. Parse session JSONL to answer how long each agent task took, which tools/skills/models were used, and how many tokens were consumed — zero dependency, local only, token is the primary metric (no cost dimension). 中文：OpenClaw 用量报告——解析 session JSONL，回答每次 agent 任务耗时、所用工具/技能/模型、token 消耗。零依赖纯本地，token 为主指标。",
   "homepage": "https://github.com/dtsola/xiaoyaoclaw-usage-report",
