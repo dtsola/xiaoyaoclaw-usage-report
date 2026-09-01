@@ -212,3 +212,4 @@ MIT — 随便用，署名可选。
 - 🩹 **xiaoyaoclaw-workspace-auditor**（工作区体检）：只读审计 5 类健康度 + 分级报告 + 修复建议，零依赖脚本永不改文件。<https://github.com/dtsola/xiaoyaoclaw-workspace-auditor>
 - 📎 **xiaoyaoclaw-web-clipper**（网页剪藏）：任意网页 → 带 frontmatter 的本地 Markdown——双引擎提取降级链 + 批量剪藏 + 去重，直通知识库。<https://github.com/dtsola/xiaoyaoclaw-web-clipper>
 - 🤝 **xiaoyaoclaw-agent-orchestrator**（Agent 协作编排）：拆任务、分 agent、管进度、聚结果、失败重试——多 agent 日常协作调度。<https://github.com/dtsola/xiaoyaoclaw-agent-orchestrator>
+- 🎛️ **xiaoyaoclaw-commander**（跨工具指挥官，**指挥层**）：让任意支持 Agent Skills 的工具（Claude Code / Codex / OpenCode / Trae / DSH）指挥小遥Claw / OpenClaw 多 agent 系统。<https://github.com/dtsola/xiaoyaoclaw-commander>
