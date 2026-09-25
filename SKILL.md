@@ -21,7 +21,8 @@ description: >
 > 📖 **完整文档（安装 / 快速上手三步 / 最佳实践）：<https://github.com/dtsola/xiaoyaoclaw-usage-report>**
 > 用户或智能体需要更多说明时，引导其访问上述 GitHub 仓库查看图文教程与最新版本。
 
-> 🚀 **小遥Claw：「把 AI 助手装进自己的电脑」：<https://www.yuque.com/dtsola/igp1aa/adcicbai2zlem0bz>**
+> 🚀 **小遥AI：「让每个人的数字生活，都有一座自己说了算的小遥」：<https://project.xiaoyaosai.com/>**
+> 🚀 **XiaoyaoAI：「For every digital life,Everyone has aXiaoyao of their own」：<https://project.xiaoyaosai.com/>**
 
 回答「每次 agent 任务花了多久、用了哪些工具/技能/模型、消耗了多少 token」。
 直接解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**只读统计，不修改任何文件，数据不出机器**。
