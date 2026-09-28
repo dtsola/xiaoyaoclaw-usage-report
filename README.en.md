@@ -71,9 +71,10 @@ python scripts/usage-report.py --by-tool  # tool latency only
 python scripts/usage-report.py --skills   # skills only
 python scripts/usage-report.py --today --json > usage-report.json   # JSON (aggregated stats only)
 python scripts/usage-report.py --today --json --include-sessions    # add session-level detail (IDs/timestamps - do not share publicly)
+python scripts/usage-report.py --today --include-paths              # show the full data directory path (redacted by default)
 ```
 
-The data directory is resolved in this order: `--state <path>` → `OPENCLAW_STATE` env var → desktop build default (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`). **The directory actually used is printed at the top of every report** for easy verification.
+The data directory is resolved in this order: `--state <path>` → `OPENCLAW_STATE` env var (the only environment variable read) → desktop build default (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`). **The directory actually used is printed at the top of every report, redacted to its last two segments**; add `--include-paths` for the full path.
 
 ## 🚀 Quick Start (3 steps, 5 minutes)
 
@@ -134,9 +135,10 @@ Want a daily report pushed automatically? Tell your agent:
 
 - **Read-only**: parses local session JSONL (`state/agents/*/sessions/*.jsonl`) only — **no file is modified, deleted or written**
 - **Zero network**: the script reads local files with the Python standard library only — **no network calls, no external services, no uploads** (GitHub / website links in these docs are human-readable references and are not used at runtime)
-- **Minimized output**: reports and JSON contain **aggregated statistics only** by default (counts / duration / tokens / tools / models / skill names) — **no conversation content, no session IDs**. Session-level detail requires the explicit `--include-sessions` flag; that output contains session identifiers and timestamps and **must not be shared publicly**
+- **Minimized output**: reports and JSON contain **aggregated statistics only** by default (counts / duration / tokens / tools / models / skill names) — **no conversation content, no session IDs, no absolute local paths** (the data directory is redacted to its last two segments, e.g. `…/openclaw/state`)
+- **Explicit opt-ins**: `--include-sessions` adds session-level fields (`agent` / `id` / `start` / `end` / `duration_ms` / `active_ms` / `model_ms` / `models` / `tokens` / `tools` / `msgs`); `--include-paths` reveals the full local path. Both print a sensitive-metadata warning — **do not share publicly**
 - **No cost estimation**: the script reads, computes and outputs no cost fields at all (docs, report and JSON are consistent)
-- **Data directory**: resolution order = `--state` argument → `OPENCLAW_STATE` env var → desktop build default; the directory actually used is printed at the top of the report
+- **Data directory**: resolution order = `--state` argument → `OPENCLAW_STATE` env var (the only environment variable read) → desktop build default; the directory actually used is printed at the top of the report, redacted to its last two segments by default
 - **Scheduling is your call**: cron / HEARTBEAT integration is never created automatically; it requires your explicit request and confirmation
 
 ## Statistics rules (important)

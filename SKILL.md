@@ -25,6 +25,13 @@ allowed-tools:
   - Read
   - Glob
   - Bash
+permissions:
+  read:
+    - OpenClaw state 目录下的 session JSONL：agents/*/sessions/*.jsonl（只读，仅聚合统计）
+  write: []
+  network: none
+  environment:
+    - OPENCLAW_STATE（可选；仅用于在未指定 --state 时定位数据目录，不做其他环境变量读取）
 ---
 
 # OpenClaw Usage Report（用量报告）
@@ -128,6 +135,7 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 | 「用了哪些技能」 | `--skills` |
 | 「导出 JSON」 | `--today --json`（默认仅聚合统计） |
 | 「要 session 级明细」 | `--today --json --include-sessions`（含 session 标识/时间戳，属敏感运维元数据，提醒勿公开分享） |
+| 「要看完整数据目录路径」 | 加 `--include-paths`（默认脱敏为末两级目录） |
 
 ### Step 4: 汇报结果
 
@@ -147,11 +155,11 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 1. **只读**：本技能只解析 session JSONL 做统计聚合，**不修改、不删除、不写入任何文件**（无 `--write` 类选项）
 2. **数据不出机器**：纯本地解析，无外部服务、无网络请求、无数据上传
 3. **不泄露会话内容**：只输出聚合统计（耗时/token 数/次数），**绝不引用或复述会话原文**；session JSONL 含个人数据，统计口径之外的内容一律不外泄
-4. **不读写配置文件**：不读取、不修改 `openclaw.json` 等任何配置文件；数据目录解析顺序固定为 `--state` 参数 → `OPENCLAW_STATE` 环境变量 → 桌面版（小遥Claw）默认路径（`%APPDATA%\xiaoyaoclaw-desktop\runtime\openclaw\state`），**实际使用的目录打印在报告首部**；找不到就询问用户，不猜测
+4. **不读写配置文件**：不读取、不修改 `openclaw.json` 等任何配置文件；数据目录解析顺序固定为 `--state` 参数 → `OPENCLAW_STATE` 环境变量（**本技能唯一读取的环境变量**）→ 桌面版（小遥Claw）默认路径（`%APPDATA%\xiaoyaoclaw-desktop\runtime\openclaw\state`）；**报告首部会打印实际使用的目录，但默认脱敏为末两级**（如 `…/openclaw/state`），完整本机路径需显式 `--include-paths`；找不到就询问用户，不猜测
 5. **零依赖**：仅 Python 3.8+ 标准库；不安装任何第三方包
 6. **不做成本估算**：脚本完全不读取、不计算、不输出 cost 字段（与文档口径一致），只报 token
 7. **cron 日报由用户决定**：不主动创建定时任务，用户明确要求并确认后才提供/添加配置
-8. **输出最小化**：默认只输出聚合统计（次数/耗时/token/工具/模型/技能名）——**不含会话内容原文、不含 session id**；JSON 的 session 级明细须显式 `--include-sessions`，属敏感运维元数据，须提醒用户勿公开分享
+8. **输出最小化**：默认只输出聚合统计（次数/耗时/token/工具/模型/技能名）——**不含会话内容原文、不含 session id、不含本机绝对路径**（路径默认脱敏为末两级，完整路径需 `--include-paths`）；JSON 的 session 级明细须显式 `--include-sessions`，属敏感运维元数据，须提醒用户勿公开分享
 9. **零网络**：运行时脚本只用 Python 标准库读本地文件，无网络请求、无外部服务调用；文档中的 GitHub / 官网链接仅供人类阅读，不参与技能运行
 
 ## 完整示例
@@ -167,6 +175,22 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 ### 场景 C：cron 每日日报
 
 用户说「配置每天 22:00 自动推送用量报告」→ 提供 cron 配置示例（agentTurn + announce）→ 用户自行在 OpenClaw 添加 → 之后每天定时收到日报。
+
+## 权限与输出字段（透明声明）
+
+| 能力 | 具体内容 |
+|---|---|
+| 读 | OpenClaw state 目录下 `agents/*/sessions/*.jsonl`（会话事件日志）——只读解析，产出聚合统计 |
+| 写 | **无**——不创建、不修改、不删除任何文件 |
+| 网络 | **无**——不使用任何网络能力 |
+| 环境变量 | 仅 `OPENCLAW_STATE`（可选；未指定 `--state` 时用于定位数据目录），不读取其他环境变量 |
+| 配置文件 | **不读不写** `openclaw.json` 等任何配置文件 |
+
+**默认输出字段**（脱敏口径）：时间范围、数据目录（脱敏末两级）、agent 过滤、任务数；按 agent/模型：调用次数 + 输入/输出 token + 模型耗时；按工具：次数/失败/总耗时/平均/最慢；skills：技能名/读取次数/agent；任务排行：agent/活跃耗时/窗口耗时/模型耗时/token/消息数/模型名；每日趋势：日期/输入输出 token/调用数。**不含**会话内容原文、session id、本机绝对路径。
+
+**`--include-sessions` 追加字段**（显式开启，输出前会打印敏感告警）：`agent` / `id`（session id）/ `start` / `end` / `duration_ms` / `active_ms` / `model_ms` / `models` / `tokens` / `tools` / `msgs`。
+
+**`--include-paths` 追加字段**：`meta.state_dir` 与报告首部的数据目录显示为完整本机路径（默认脱敏为末两级）。
 
 ## 姊妹项目
 

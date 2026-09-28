@@ -57,8 +57,8 @@ thinking_level_change / custom（model-snapshot、openclaw:prompt-error）。
 6. 每日趋势：每日输入/输出 token、调用数
 
 CLI：`--today / --week / --all / --agent <name> / --by-tool / --skills / --by-session / --daily / --json / --include-sessions / --state <path>`。
-数据目录解析顺序：`--state` 参数 → `OPENCLAW_STATE` 环境变量 → 桌面版（小遥Claw）默认路径；**实际使用的目录打印在报告首部**。
-输出最小化：默认只输出聚合统计（不含会话内容原文、不含 session id）；`--include-sessions` 才输出 session 级明细（敏感运维元数据）。
+数据目录解析顺序：`--state` 参数 → `OPENCLAW_STATE` 环境变量（唯一读取的环境变量）→ 桌面版（小遥Claw）默认路径；报告首部打印实际使用的目录，**默认脱敏为末两级**（`--include-paths` 才显示完整路径）。
+输出最小化：默认只输出聚合统计（不含会话内容原文、不含 session id、不含本机绝对路径）；`--include-sessions` 才输出 session 级明细（字段：agent/id/start/end/duration_ms/active_ms/model_ms/models/tokens/tools/msgs），`--include-paths` 才输出完整本机路径。
 
 ## 6. 仓库结构
 

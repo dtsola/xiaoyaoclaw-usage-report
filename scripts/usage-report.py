@@ -15,6 +15,7 @@ usage-report.py — OpenClaw 性能用量查询工具（零依赖，纯标准库
 输出范围：只输出聚合统计——不含会话内容原文、不含 session 标识；
           session 级明细（session id / 起止时间）必须显式 --include-sessions 才输出。
 成本：本脚本不读取、不计算、不输出任何 cost 字段（token 为通用主指标）。
+路径：数据目录默认脱敏显示（仅末两级），完整本机路径需显式 --include-paths。
 
 统计口径（重要）：
   - 真实 token 消耗 = input + output（totalTokens 含 cacheRead 会在每轮重复计数，禁用）
@@ -27,6 +28,7 @@ import glob
 import io
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -329,6 +331,15 @@ def in_window(ts, args, now=None):
     return True
 
 
+def redact_path(p):
+    """路径脱敏：默认只保留末两级目录，避免在可分享的输出里暴露本机完整路径。"""
+    if not p:
+        return "(未指定)"
+    parts = [x for x in re.split(r"[\\/]+", str(p).strip()) if x]
+    tail = parts[-2:] if len(parts) >= 2 else parts
+    return "…/" + "/".join(tail)
+
+
 def report(r, args):
     out = []
     now = datetime.now(timezone.utc)
@@ -344,7 +355,9 @@ def report(r, args):
     out.append("OpenClaw 用量报告")
     out.append(f"时间范围: {'今天' if args.today else '近7天' if args.week else '全部'} | "
                f"agent 过滤: {args.agent or '全部'} | sessions: {len(sess)}")
-    out.append(f"数据源: {args.state} （只读解析 agents/*/sessions/*.jsonl）")
+    shown = args.state if args.include_paths else redact_path(args.state)
+    out.append(f"数据源: {shown} （只读解析 agents/*/sessions/*.jsonl）"
+               + ("" if args.include_paths else "；完整路径用 --include-paths"))
     out.append("输出范围: 仅聚合统计（次数/耗时/token/工具/模型/技能名）"
                "——不含会话内容原文、不含 session id")
     out.append("=" * 60)
@@ -411,7 +424,8 @@ def main():
     ap = argparse.ArgumentParser(
         description="OpenClaw 用量/性能查询（只读、零依赖、纯本地；不做成本估算）",
         epilog="数据目录解析顺序：--state 参数 → OPENCLAW_STATE 环境变量 → 桌面版（小遥Claw）默认路径；"
-               "实际使用的目录会打印在报告首部。输出仅聚合统计（不含会话内容原文、默认不含 session id）。"
+               "实际使用的目录会脱敏打印在报告首部（完整路径需 --include-paths）。"
+               "输出仅聚合统计（不含会话内容原文、默认不含 session id）。"
                "文案默认中文，可按需替换为任意语言。",
     )
     ap.add_argument("--state", default=os.environ.get("OPENCLAW_STATE", DEFAULT_STATE),
@@ -427,10 +441,17 @@ def main():
     ap.add_argument("--by-model-time", action="store_true", help="任务排行按模型耗时排序")
     ap.add_argument("--daily", action="store_true", help="每日趋势")
     ap.add_argument("--json", action="store_true", help="JSON 输出（默认仅聚合统计）")
+    ap.add_argument("--include-paths", action="store_true",
+                    help="显示数据目录的完整本机路径（默认脱敏为末两级目录）。"
+                         "⚠️ 属本地环境元数据，请勿公开分享")
     ap.add_argument("--include-sessions", action="store_true",
                     help="JSON 中追加 session 级明细（session id / 起止时间 / 模型序列 / 工具集合）。"
                          "⚠️ 属敏感运维元数据，请勿公开分享；默认关闭")
     args = ap.parse_args()
+
+    if args.include_paths:
+        sys.stderr.write("[WARN] --include-paths：输出将包含本机绝对路径（本地环境元数据），"
+                         "请勿公开分享。\n")
 
     r = analyze(args.state)
     if r is None:
@@ -445,8 +466,13 @@ def main():
         slim = {
             "meta": {
                 "scope": "aggregated+session-level" if args.include_sessions else "aggregated",
-                "state_dir": args.state,
-                "note": "不含会话内容原文；默认不含 session id 与 per-session 时间戳",
+                "state_dir": args.state if args.include_paths else redact_path(args.state),
+                "paths_included": bool(args.include_paths),
+                "sessions_included": bool(args.include_sessions),
+                "session_fields": (["agent", "id", "start", "end", "duration_ms", "active_ms",
+                                    "model_ms", "models", "tokens", "tools", "msgs"]
+                                   if args.include_sessions else []),
+                "note": "不含会话内容原文；默认不含 session id / per-session 时间戳，也不含本机绝对路径",
             },
             "agents": {a: {m: d for m, d in mm.items()} for a, mm in r["agents"].items()},
             "tools": {t: {**d, "agents": sorted(d["agents"])} for t, d in r["tools"].items()},

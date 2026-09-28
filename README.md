@@ -73,9 +73,10 @@ python scripts/usage-report.py --by-tool  # 仅工具耗时
 python scripts/usage-report.py --skills   # 仅技能使用
 python scripts/usage-report.py --today --json > usage-report.json   # JSON（默认仅聚合统计）
 python scripts/usage-report.py --today --json --include-sessions    # 追加 session 级明细（含标识/时间戳，勿公开分享）
+python scripts/usage-report.py --today --include-paths              # 显示完整数据目录路径（默认脱敏）
 ```
 
-数据目录解析顺序：`--state <路径>` → 环境变量 `OPENCLAW_STATE` → 桌面版（小遥Claw）默认路径（`C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`）；**实际使用的目录会打印在报告首部**，便于核对。
+数据目录解析顺序：`--state <路径>` → 环境变量 `OPENCLAW_STATE`（唯一读取的环境变量）→ 桌面版（小遥Claw）默认路径（`C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`）；**报告首部会打印实际使用的目录（默认脱敏为末两级）**，要看完整路径加 `--include-paths`。
 
 ## 🚀 快速上手（三步，5 分钟）
 
@@ -134,9 +135,10 @@ agent 完成：定位 usage-report 技能 → 解析 state 目录下的 session 
 
 - **只读**：仅解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**不修改、不删除、不写入任何文件**
 - **零网络**：脚本只用 Python 标准库读本地文件，**无网络请求、无外部服务、无上传**（文中的 GitHub / 官网链接仅供人类阅读，不参与技能运行）
-- **输出最小化**：报告与 JSON 默认**只含聚合统计**（次数 / 耗时 / token / 工具 / 模型 / 技能名）——**不含会话内容原文、不含 session id**；确需 session 级明细时用 `--include-sessions` 显式开启，该输出含 session 标识与时间戳，**请勿公开分享**
+- **输出最小化**：报告与 JSON 默认**只含聚合统计**（次数 / 耗时 / token / 工具 / 模型 / 技能名）——**不含会话内容原文、不含 session id、不含本机绝对路径**（数据目录默认脱敏为末两级，如 `…/openclaw/state`）
+- **显式开启的例外**：`--include-sessions` 追加 session 级字段（`agent` / `id` / `start` / `end` / `duration_ms` / `active_ms` / `model_ms` / `models` / `tokens` / `tools` / `msgs`）；`--include-paths` 显示完整本机路径。两者均会打印敏感告警，**请勿公开分享**
 - **不做成本估算**：脚本不读取、不计算、不输出任何 cost 字段（文档、报告、JSON 三处口径一致）
-- **数据目录**：解析顺序 = `--state` 参数 → `OPENCLAW_STATE` 环境变量 → 桌面版默认路径；实际使用的目录打印在报告首部
+- **数据目录**：解析顺序 = `--state` 参数 → `OPENCLAW_STATE` 环境变量（本工具**唯一读取的环境变量**）→ 桌面版默认路径；报告首部打印实际使用的目录，默认脱敏为末两级
 - **定时任务由你决定**：cron / HEARTBEAT 集成不自动创建，需要你显式要求并确认
 
 ## 统计口径（重要）
