@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="hero-title hero-desc">
   <title id="hero-title">OpenClaw Usage Report</title>
-  <desc id="hero-desc">Usage and performance reporting for OpenClaw agents: parse session JSONL for task duration, tool latency, model tokens and skill usage. Zero dependencies, local only, token-first. Shows a terminal panel running usage-report.py with a per-tool latency table.</desc>
+  <desc id="hero-desc">Usage and performance reporting for OpenClaw agents: parse session JSONL for task duration, tool latency, model tokens and skill usage. Zero dependencies, local only, token-first. Shows a terminal panel running usage-report.py with a per-tool latency table. Caption note: the bilingual (English + Chinese) caption and caption line below are an intentional, optional brand asset for this repository image only; the tool's report text follows the language the user speaks and imposes no locale, so the English caption is shown first.</desc>
 
   <rect width="1200" height="360" rx="20" fill="#0d1117"/>
 
@@ -9,10 +9,11 @@
 
     <text x="0" y="112" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="52" font-weight="800" fill="#e6edf3">Usage Report</text>
 
-    <text x="0" y="170" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="22" fill="#c9d1d9">用量报告 · token 主指标 / Usage report, token-first</text>
-    <text x="0" y="202" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="19" fill="#8b949e">session JSONL · 任务/工具/模型耗时 · 零依赖 / zero-dependency</text>
+    <text x="0" y="170" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="22" fill="#c9d1d9">Usage report · token-first（用量报告）</text>
+    <text x="0" y="202" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="19" fill="#8b949e">session JSONL · task/tool latency · zero-dependency</text>
 
-    <text x="0" y="310" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" letter-spacing="1" fill="#8b949e">MIT LICENSE · SKILL FOR OPENCLAW · v1.0.6</text>
+    <text x="0" y="272" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="15" fill="#6e7681">bilingual caption · optional · language-agnostic tool</text>
+    <text x="0" y="310" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" letter-spacing="1" fill="#8b949e">MIT LICENSE · SKILL FOR OPENCLAW · v1.0.7</text>
   </g>
 
   <g id="terminal-panel" transform="translate(700 44)">

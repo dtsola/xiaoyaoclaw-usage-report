@@ -1,6 +1,6 @@
 {
   "name": "xiaoyaoclaw-usage-report",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "category": "Usage Analytics / Performance",
   "description": "OpenClaw usage & performance reporting. Parse session JSONL to answer how long each agent task took, which tools/skills/models were used, and how many tokens were consumed — zero dependency, local only, token is the primary metric. The script reads, computes and outputs no cost fields at all (documentation, report and JSON follow the same scope). Output is minimized to aggregated statistics: no conversation content, no session identifiers and no absolute local paths (the resolved data directory is printed redacted to its last two segments by default; the full path requires the explicit --include-paths flag). Session-level detail (agent/id/start/end/duration_ms/active_ms/model_ms/models/tokens/tools/msgs) is opt-in via --include-sessions. Runtime makes no network calls; doc links are human-readable references only. Language: report text defaults to Chinese and can be adapted to the user's language; the skill imposes no language or region restriction. 中文：OpenClaw 用量报告——解析 session JSONL，回答每次 agent 任务耗时、所用工具/技能/模型、token 消耗。零依赖纯本地，token 为主指标，不做成本估算。输出最小化：默认只输出聚合统计，不含会话内容原文、不含 session 标识、不含本机绝对路径（数据目录默认脱敏为末两级目录，完整路径需 --include-paths）；session 级明细需显式 --include-sessions。运行时不联网。",
   "homepage": "https://github.com/dtsola/xiaoyaoclaw-usage-report",
