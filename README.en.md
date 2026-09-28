@@ -6,6 +6,9 @@
   <img src="./assets/readme/hero.svg" width="100%" alt="OpenClaw Usage Report — parse session JSONL for task duration, tool/skill/model usage and token consumption, zero-dependency & local-only">
 </p>
 
+> Note: the hero image is a Chinese/bilingual brand asset; the report text defaults to Chinese and can be adapted to your language — this tool imposes no language or region restriction.
+
+
 > Answer "how long did each agent task take, which tools/skills/models were used, how many tokens were consumed".
 > OpenClaw usage & performance reporting — parse session JSONL locally, zero dependency, data never leaves your machine.
 
@@ -31,7 +34,8 @@ But the data has always been there — local session JSONL files (`state/agents/
 - 🧩 **Skill usage** — inferred from `read` calls: skill name, load count, agents
 - 📈 **Daily trend** — daily input/output tokens and call counts
 - 🤖 **MCP tools** — same structure as regular tools (toolCall/toolResult), covered natively
-- 🔒 **Zero-dependency, local-only** — pure Python standard library, no uploads
+- 🔒 **Zero-dependency, local-only** — pure Python standard library, no network calls, no uploads
+- 🧼 **Minimized output** — reports and JSON contain aggregated statistics only by default (no conversation content, no session IDs); session-level detail requires the explicit `--include-sessions` flag
 - ⏰ **Optional Cron daily report** — `--today --json` for scheduled reports; enable it yourself
 
 ## Install
@@ -48,7 +52,7 @@ git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
 ## Usage
 
 1. Install the skill (from ClawHub, or drop it into your skills directory manually)
-2. Just tell your agent "**run today's usage report**" — it will automatically:
+2. Ask explicitly (the skill never runs on its own and does no background scanning) — tell your agent "**run today's usage report**"; it will:
    - Locate the usage-report skill → detect the OpenClaw state directory
    - Parse all agents' session JSONL → output task duration / model tokens / tool latency / skill usage / daily trend
 3. Keep asking conversationally: slowest tool, per-agent accounting, 7-day trend, skill inventory
@@ -65,10 +69,11 @@ python scripts/usage-report.py --all      # all history
 python scripts/usage-report.py --agent xiaoxia   # filter by agent
 python scripts/usage-report.py --by-tool  # tool latency only
 python scripts/usage-report.py --skills   # skills only
-python scripts/usage-report.py --today --json > usage-report.json   # JSON output
+python scripts/usage-report.py --today --json > usage-report.json   # JSON (aggregated stats only)
+python scripts/usage-report.py --today --json --include-sessions    # add session-level detail (IDs/timestamps - do not share publicly)
 ```
 
-The data directory is auto-detected (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`); override with `--state <path>` or the `OPENCLAW_STATE` env var.
+The data directory is resolved in this order: `--state <path>` → `OPENCLAW_STATE` env var → desktop build default (Windows XiaoyaoClaw: `C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`). **The directory actually used is printed at the top of every report** for easy verification.
 
 ## 🚀 Quick Start (3 steps, 5 minutes)
 
@@ -84,7 +89,9 @@ Tell your agent:
 
 > Run today's usage report
 
-The agent automatically: locates the usage-report skill → detects the state directory → parses all session JSONL → outputs task duration / model tokens / tool latency / skill usage / daily trend overview.
+(**Activation boundary**: it only runs when you explicitly ask for usage/performance data; generic words like "report" or "stats" trigger a clarifying question instead of a full scan of every agent's sessions.)
+
+The agent then: locates the usage-report skill → parses session JSONL under the state directory (today by default) → outputs task duration / model tokens / tool latency / skill usage / daily trend overview.
 
 ### Step 3: Verify + conversational follow-ups
 
@@ -101,6 +108,8 @@ Check these key blocks in the report:
   工具        次数  失败   总耗时   平均   最慢
   exec        204    1    54.5m  16.0s  6.2m
 ```
+
+> Note: the sample above keeps the tool's built-in Chinese labels. Report text defaults to Chinese and can be adapted to your language — the tool imposes no language or region restriction.
 
 No need to memorize any commands — just ask:
 
@@ -121,17 +130,26 @@ Want a daily report pushed automatically? Tell your agent:
 | Pre-release review | "Run the last 7 days usage report" for the trend |
 | Automation | "Schedule a usage report push at 22:00 daily" |
 
+## Privacy & data scope
+
+- **Read-only**: parses local session JSONL (`state/agents/*/sessions/*.jsonl`) only — **no file is modified, deleted or written**
+- **Zero network**: the script reads local files with the Python standard library only — **no network calls, no external services, no uploads** (GitHub / website links in these docs are human-readable references and are not used at runtime)
+- **Minimized output**: reports and JSON contain **aggregated statistics only** by default (counts / duration / tokens / tools / models / skill names) — **no conversation content, no session IDs**. Session-level detail requires the explicit `--include-sessions` flag; that output contains session identifiers and timestamps and **must not be shared publicly**
+- **No cost estimation**: the script reads, computes and outputs no cost fields at all (docs, report and JSON are consistent)
+- **Data directory**: resolution order = `--state` argument → `OPENCLAW_STATE` env var → desktop build default; the directory actually used is printed at the top of the report
+- **Scheduling is your call**: cron / HEARTBEAT integration is never created automatically; it requires your explicit request and confirmation
+
 ## Statistics rules (important)
 
 1. **Real token usage = input + output**. `totalTokens` includes cacheRead (re-counted every turn; measured inflation 1.3x–14x+, up to 568x per message) — the script already avoids this.
 2. **Tool duration = toolResult.ts − assistant(toolCall).ts**, includes the model's tool-call decision time (not pure execution time).
 3. **Model latency is an estimate** (assistant event ts − previous event ts, capped at 10 min). ⚠️ Do not use `message.timestamp` (batch-write timestamp); exact duration lives only in the diagnostics-otel event layer.
-4. **No cost dimension**: pricing differs per provider; tokens are the universal metric. To add costs, configure `models.providers.*.cost` in OpenClaw and extend.
+4. **No cost estimation**: the script reads, computes and outputs **no cost fields** (docs, report and JSON are fully consistent); pricing differs per provider, so tokens are the universal metric. For costs, convert tokens × your own unit price.
 5. **Skill stats** cover only skills actually loaded via `read` (metadata-injected but never loaded ones are not counted).
 
 ## Cron daily report (optional, user-configured)
 
-The tool supports `--today --json` output for scheduled daily token reports. Whether to enable it and when to push is entirely up to the user.
+The tool supports `--today --json` output (aggregated statistics only by default) for scheduled daily token reports. **The skill never creates scheduled jobs itself**: whether to enable one and when to push is entirely up to the user's explicit request and confirmation.
 
 OpenClaw cron example:
 
@@ -202,6 +220,8 @@ Xiaoyao product family user group — feedback · exchange · suggestions:
 <p align="center">Scan to join, or add WeChat <code>dtsola</code> (note: <b>加群</b>)</p>
 
 ## Sister projects
+
+> The links below are **human-readable references** (docs / community); the runtime script makes no network requests and never opens them.
 
 - 🏠 **xiaoyaoclaw-workspace-initializer** (workspace initializer): gives every agent a "home" — standard directory structure + WORKSPACE.md rules + multi-agent config safety. <https://github.com/dtsola/xiaoyaoclaw-workspace-initializer>
 - 🧠 **xiaoyaoclaw-memory-distill** (memory distillation): turn conversations into structured memory — semantic classification + first-run build + incremental dedup + sensitive-info skip. <https://github.com/dtsola/xiaoyaoclaw-memory-distill>

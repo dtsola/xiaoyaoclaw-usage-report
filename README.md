@@ -8,6 +8,9 @@
   <img src="./assets/readme/hero.svg" width="100%" alt="OpenClaw Usage Report — parse session JSONL for task duration, tool/skill/model usage and token consumption, zero-dependency & local-only">
 </p>
 
+> 注：头图为**中文/双语品牌素材**（`assets/readme/hero.svg`）；报告文案默认中文，可按用户语言调整——本工具不对语言或地区设限。
+
+
 > 回答「每次 agent 任务花了多久、用了哪些工具/技能/模型、消耗了多少 token」。
 > OpenClaw usage & performance reporting — how long each task took, which tools/skills/models were used, how many tokens were consumed.
 
@@ -33,7 +36,8 @@ OpenClaw 没有内置 per-task 性能面板。想优化你的 agent，你却：
 - 🧩 **Skills 使用**：从 read 调用推断——技能名、读取次数、使用 agent
 - 📈 **每日趋势**：每日输入/输出 token、调用数
 - 🤖 **MCP 工具**：与普通工具同构（toolCall/toolResult），天然覆盖
-- 🔒 **零依赖纯本地**：仅 Python 标准库，无外部依赖、无数据上传
+- 🔒 **零依赖纯本地**：仅 Python 标准库，无外部依赖、无网络请求、无数据上传
+- 🧼 **输出最小化**：报告与 JSON 默认只含聚合统计（不含会话内容原文、不含 session id）；session 级明细需显式 `--include-sessions`
 - ⏰ **Cron 日报可选项**：`--today --json` 挂定时任务，是否启用由你决定
 
 ## 安装
@@ -50,7 +54,7 @@ git clone https://github.com/dtsola/xiaoyaoclaw-usage-report
 ## 使用
 
 1. 安装技能（ClawHub 或手动放入 skills 目录）
-2. 直接对 agent 说「**跑今日用量报告**」，agent 会自动：
+2. **由你明确请求**（本技能不会自动运行、不做后台扫描）——对 agent 说「**跑今日用量报告**」，agent 会：
    - 定位 usage-report 技能 → 检测 OpenClaw state 目录
    - 解析全部 agent 的 session JSONL → 输出任务耗时 / 模型 token / 工具耗时 / 技能使用 / 每日趋势
 3. 继续对话追问：最慢工具、按 agent 对账、近 7 天趋势、技能盘点
@@ -67,10 +71,11 @@ python scripts/usage-report.py --all      # 全部
 python scripts/usage-report.py --agent xiaoxia   # 按 agent 过滤
 python scripts/usage-report.py --by-tool  # 仅工具耗时
 python scripts/usage-report.py --skills   # 仅技能使用
-python scripts/usage-report.py --today --json > usage-report.json   # JSON 输出
+python scripts/usage-report.py --today --json > usage-report.json   # JSON（默认仅聚合统计）
+python scripts/usage-report.py --today --json --include-sessions    # 追加 session 级明细（含标识/时间戳，勿公开分享）
 ```
 
-数据目录默认自动检测（Windows 小遥Claw：`C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`）；覆盖用 `--state <路径>` 或环境变量 `OPENCLAW_STATE`。
+数据目录解析顺序：`--state <路径>` → 环境变量 `OPENCLAW_STATE` → 桌面版（小遥Claw）默认路径（`C:\Users\<user>\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state`）；**实际使用的目录会打印在报告首部**，便于核对。
 
 ## 🚀 快速上手（三步，5 分钟）
 
@@ -86,7 +91,9 @@ clawhub install xiaoyaoclaw-usage-report
 
 > 跑今日用量报告
 
-agent 自动完成：定位 usage-report 技能 → 检测 state 目录 → 解析全部 session JSONL → 输出任务耗时 / 模型 token / 工具耗时 / 技能使用 / 每日趋势总览。
+（**触发边界**：仅在你明确点名用量 / 性能查询时执行；泛指词如「报告」「统计」会先反问确认，不会直接全量扫描所有 agent）
+
+agent 完成：定位 usage-report 技能 → 解析 state 目录下的 session JSONL（默认今日）→ 输出任务耗时 / 模型 token / 工具耗时 / 技能使用 / 每日趋势总览。
 
 ### Step 3：验收 + 对话式进阶查询
 
@@ -123,17 +130,26 @@ agent 自动完成：定位 usage-report 技能 → 检测 state 目录 → 解�
 | 发布前评估 | 「跑近 7 天用量报告」看消耗趋势 |
 | 自动化 | 「配置每天 22:00 自动推送用量报告」 |
 
+## 隐私与数据范围
+
+- **只读**：仅解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**不修改、不删除、不写入任何文件**
+- **零网络**：脚本只用 Python 标准库读本地文件，**无网络请求、无外部服务、无上传**（文中的 GitHub / 官网链接仅供人类阅读，不参与技能运行）
+- **输出最小化**：报告与 JSON 默认**只含聚合统计**（次数 / 耗时 / token / 工具 / 模型 / 技能名）——**不含会话内容原文、不含 session id**；确需 session 级明细时用 `--include-sessions` 显式开启，该输出含 session 标识与时间戳，**请勿公开分享**
+- **不做成本估算**：脚本不读取、不计算、不输出任何 cost 字段（文档、报告、JSON 三处口径一致）
+- **数据目录**：解析顺序 = `--state` 参数 → `OPENCLAW_STATE` 环境变量 → 桌面版默认路径；实际使用的目录打印在报告首部
+- **定时任务由你决定**：cron / HEARTBEAT 集成不自动创建，需要你显式要求并确认
+
 ## 统计口径（重要）
 
 1. **token 真实消耗 = input + output**。`totalTokens` 含 cacheRead（每轮重复计数），缓存命中率越高虚高越严重（实测 1.3x~14x+，单条最高 568x）——脚本已规避。
 2. **工具耗时 = toolResult.ts − assistant(toolCall).ts**，含模型生成 toolCall 的决策时间（非纯执行时间）。
 3. **模型耗时为近似估算**（assistant 事件 ts − 前一条事件 ts，cap 10min）。⚠️ 不能用 message.timestamp（批量写入时间戳）；精确 duration 仅在 OpenClaw diagnostics-otel 事件层。
-4. **成本维度不提供**：各模型供应商定价不同，token 是通用主指标；如需成本，自行在 OpenClaw 配置 `models.providers.*.cost` 后扩展。
+4. **不做成本估算**：脚本**不读取、不计算、不输出任何 cost 字段**（文档 / 报告 / JSON 口径完全一致）；各模型供应商定价不同，token 是通用主指标；需要成本请按 token × 单价自行换算。
 5. **skills 统计**：仅覆盖「被 read 加载过」的技能（metadata 注入未加载的不计）。
 
 ## Cron 每日日报（可选项，用户自行设置）
 
-工具支持 `--today --json` 输出，可挂定时任务生成每日 token 日报。是否启用、何时推送，完全由使用者决定。
+工具支持 `--today --json` 输出（默认仅聚合统计），可挂定时任务生成每日 token 日报。**本技能不会自行创建定时任务**：是否启用、何时推送，完全由使用者显式要求并确认。
 
 OpenClaw 内可用 cron：
 
@@ -204,6 +220,8 @@ MIT — 随便用，署名可选。
 <p align="center">扫码加群，或添加微信 <code>dtsola</code>（备注：<b>加群</b>）</p>
 
 ## 姊妹项目
+
+> 以下链接**仅供人类阅读**（文档 / 社区参考）；本技能运行时零网络请求，不访问任何链接。
 
 - 🏠 **xiaoyaoclaw-workspace-initializer**（工作区初始化器）：给每个 agent 一个「家」——标准目录结构 + WORKSPACE.md 规范 + 多 agent 配置安全。<https://github.com/dtsola/xiaoyaoclaw-workspace-initializer>
 - 🧠 **xiaoyaoclaw-memory-distill**（记忆蒸馏）：把对话蒸馏成结构化记忆——语义分级 + 首次建忆 + 增量去重 + 敏感跳过。<https://github.com/dtsola/xiaoyaoclaw-memory-distill>

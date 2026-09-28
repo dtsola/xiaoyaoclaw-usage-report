@@ -5,11 +5,16 @@ usage-report.py — OpenClaw 性能用量查询工具（零依赖，纯标准库
 
 数据源：OpenClaw session JSONL（state/agents/*/sessions/*.jsonl）
 能力：
-  - 按 agent / 模型 / 日期 聚合 token + 成本 + 平均耗时
+  - 按 agent / 模型 / 日期 聚合 token（input+output）+ 平均耗时
   - 按工具聚合：调用次数 / 平均耗时 / 失败率 / 总耗时
   - 按任务(session)聚合：起止时间、模型序列、总 token、总耗时
   - skills 使用统计（从 read 工具参数推断 SKILL.md）
   - 支持 --today / --week / --all / --agent / --by-model / --by-tool / --skills / --json
+
+语言：文案默认中文，可按需替换为任意语言（本工具不对使用者语言/地区设限）。
+输出范围：只输出聚合统计——不含会话内容原文、不含 session 标识；
+          session 级明细（session id / 起止时间）必须显式 --include-sessions 才输出。
+成本：本脚本不读取、不计算、不输出任何 cost 字段（token 为通用主指标）。
 
 统计口径（重要）：
   - 真实 token 消耗 = input + output（totalTokens 含 cacheRead 会在每轮重复计数，禁用）
@@ -28,6 +33,9 @@ from datetime import datetime, timedelta, timezone
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
+# 数据目录解析顺序（与 --state 帮助、SKILL.md、README 口径一致）：
+#   1) --state <路径>   2) OPENCLAW_STATE 环境变量   3) 桌面版（小遥Claw）标准路径（下行兜底值）
+# 实际使用的目录会打印在报告首部，便于用户核对（不做隐式猜测）。
 DEFAULT_STATE = r"C:\Users\Administrator\AppData\Roaming\xiaoyaoclaw-desktop\runtime\openclaw\state"
 
 
@@ -110,15 +118,15 @@ def analyze(state_dir):
     """主分析：返回结构化结果"""
     agents = defaultdict(lambda: defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0,
                                                       "cache_read": 0, "cache_write": 0,
-                                                      "cost": 0.0, "calls": 0,
+                                                      "calls": 0,
                                                       "total_ms": 0, "max_ms": 0}))
     tools = defaultdict(lambda: {"count": 0, "errors": 0, "total_ms": 0,
                                  "max_ms": 0, "min_ms": None, "agents": set()})
     skills = defaultdict(lambda: {"count": 0, "agents": set()})
-    sessions = []  # (agent, session_id, start, end, models, tokens, cost, tools, msgs)
-    daily = defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0, "cost": 0.0, "calls": 0,
+    sessions = []  # (agent, session_id, start, end, models, tokens, tools, msgs)
+    daily = defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0, "calls": 0,
                                  "agents": defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0,
-                                                                "cost": 0.0, "calls": 0})})
+                                                                "calls": 0})})
 
     files = find_session_files(state_dir)
     if not files:
@@ -136,7 +144,6 @@ def analyze(state_dir):
         s_end = None
         s_models = set()
         s_tokens = {"in": 0, "out": 0}
-        s_cost = 0.0
         s_model_ms = 0
         s_tools = set()
         s_msgs = 0
@@ -174,12 +181,6 @@ def analyze(state_dir):
                 tout = usage.get("output") or 0
                 cr = usage.get("cacheRead") or 0
                 cw = usage.get("cacheWrite") or 0
-                cost = 0.0
-                c = usage.get("cost")
-                if isinstance(c, dict):
-                    cost = float(c.get("total") or 0)
-                elif isinstance(c, (int, float)):
-                    cost = float(c)
 
                 model = msg.get("model") or "unknown"
                 provider = msg.get("provider") or "unknown"
@@ -192,7 +193,6 @@ def analyze(state_dir):
                         agents[agent][mkey]["tokens_out"] += tout
                         agents[agent][mkey]["cache_read"] += cr
                         agents[agent][mkey]["cache_write"] += cw
-                        agents[agent][mkey]["cost"] += cost
                         agents[agent][mkey]["calls"] += 1
                         # 模型耗时估算：本事件 ts − 前一条事件 ts（0 < gap < 10min）。
                         # ⚠️ 不能用 message.timestamp（批量写入时间戳，非推理耗时）。
@@ -205,16 +205,13 @@ def analyze(state_dir):
                                 s_model_ms += llm_dur
                         s_tokens["in"] += tin
                         s_tokens["out"] += tout
-                        s_cost += cost
                         s_models.add(mkey)
                         daily_key = datetime.fromtimestamp(mts / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
                         daily[daily_key]["tokens_in"] += tin
                         daily[daily_key]["tokens_out"] += tout
-                        daily[daily_key]["cost"] += cost
                         daily[daily_key]["calls"] += 1
                         daily[daily_key]["agents"][agent]["tokens_in"] += tin
                         daily[daily_key]["agents"][agent]["tokens_out"] += tout
-                        daily[daily_key]["agents"][agent]["cost"] += cost
                         daily[daily_key]["agents"][agent]["calls"] += 1
 
                     # 工具调用发起
@@ -276,7 +273,6 @@ def analyze(state_dir):
                 "model_ms": s_model_ms,
                 "models": sorted(s_models),
                 "tokens": s_tokens["in"] + s_tokens["out"],
-                "cost": s_cost,
                 "tools": sorted(s_tools),
                 "msgs": s_msgs,
             })
@@ -315,7 +311,6 @@ def apply_agent_filter(r, agent_name):
     for v in r["daily"].values():
         v["tokens_in"] = v["agents"][agent_name]["tokens_in"]
         v["tokens_out"] = v["agents"][agent_name]["tokens_out"]
-        v["cost"] = v["agents"][agent_name]["cost"]
         v["calls"] = v["agents"][agent_name]["calls"]
         v["agents"] = {agent_name: v["agents"][agent_name]}
     return r
@@ -349,6 +344,9 @@ def report(r, args):
     out.append("OpenClaw 用量报告")
     out.append(f"时间范围: {'今天' if args.today else '近7天' if args.week else '全部'} | "
                f"agent 过滤: {args.agent or '全部'} | sessions: {len(sess)}")
+    out.append(f"数据源: {args.state} （只读解析 agents/*/sessions/*.jsonl）")
+    out.append("输出范围: 仅聚合统计（次数/耗时/token/工具/模型/技能名）"
+               "——不含会话内容原文、不含 session id")
     out.append("=" * 60)
 
     # 1. 汇总
@@ -356,7 +354,8 @@ def report(r, args):
     tot_ms = sum(s["duration_ms"] for s in sess)
     out.append(f"\n📊 总览: {len(sess)} 个任务 | 总 token(input+output): {tot_in:,} | "
                f"总耗时: {fmt_ms(tot_ms)}")
-    out.append("  (任务耗时 = session 首条用户消息 → 末条消息，含用户思考间隔；成本维度已按需移除，token 为主指标)")
+    out.append("  (任务耗时 = session 首条用户消息 → 末条消息，含用户思考间隔；"
+               "本技能不做成本估算——脚本不读取、不计算、不输出任何 cost 字段，token 为通用主指标)")
 
     # 2. 按 agent + 模型
     out.append("\n📦 按 agent / 模型（token=input+output 真实消耗；模型耗时≈本消息ts−前事件ts，cap 10min）:")
@@ -409,9 +408,16 @@ def report(r, args):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="OpenClaw 用量/性能查询")
+    ap = argparse.ArgumentParser(
+        description="OpenClaw 用量/性能查询（只读、零依赖、纯本地；不做成本估算）",
+        epilog="数据目录解析顺序：--state 参数 → OPENCLAW_STATE 环境变量 → 桌面版（小遥Claw）默认路径；"
+               "实际使用的目录会打印在报告首部。输出仅聚合统计（不含会话内容原文、默认不含 session id）。"
+               "文案默认中文，可按需替换为任意语言。",
+    )
     ap.add_argument("--state", default=os.environ.get("OPENCLAW_STATE", DEFAULT_STATE),
-                    help="OpenClaw state 目录（默认自动检测）")
+                    help="OpenClaw state 目录。解析顺序：本参数 → OPENCLAW_STATE 环境变量 → "
+                         "桌面版（小遥Claw）默认路径；未显式指定时使用兜底默认值，"
+                         "并在报告首部打印实际使用的目录")
     ap.add_argument("--today", action="store_true", help="仅今天")
     ap.add_argument("--week", action="store_true", help="近 7 天")
     ap.add_argument("--agent", default=None, help="按 agent 过滤")
@@ -420,7 +426,10 @@ def main():
     ap.add_argument("--by-session", action="store_true", help="任务耗时排行")
     ap.add_argument("--by-model-time", action="store_true", help="任务排行按模型耗时排序")
     ap.add_argument("--daily", action="store_true", help="每日趋势")
-    ap.add_argument("--json", action="store_true", help="JSON 输出")
+    ap.add_argument("--json", action="store_true", help="JSON 输出（默认仅聚合统计）")
+    ap.add_argument("--include-sessions", action="store_true",
+                    help="JSON 中追加 session 级明细（session id / 起止时间 / 模型序列 / 工具集合）。"
+                         "⚠️ 属敏感运维元数据，请勿公开分享；默认关闭")
     args = ap.parse_args()
 
     r = analyze(args.state)
@@ -431,15 +440,24 @@ def main():
     r = apply_agent_filter(r, args.agent)
 
     if args.json:
-        # 简化 JSON：只输出核心聚合（按窗口过滤 daily，与文本输出一致）
+        # 输出最小化：默认只出聚合统计。session 级明细（session id / 起止时间 / 模型序列）
+        # 必须显式 --include-sessions 才输出——该类元数据属敏感运维信息，开启时给出警告。
         slim = {
+            "meta": {
+                "scope": "aggregated+session-level" if args.include_sessions else "aggregated",
+                "state_dir": args.state,
+                "note": "不含会话内容原文；默认不含 session id 与 per-session 时间戳",
+            },
             "agents": {a: {m: d for m, d in mm.items()} for a, mm in r["agents"].items()},
             "tools": {t: {**d, "agents": sorted(d["agents"])} for t, d in r["tools"].items()},
             "skills": {k: {"count": v["count"], "agents": sorted(v["agents"])} for k, v in r["skills"].items()},
-            "sessions": [s for s in r["sessions"] if in_window(s["start"], args)],
             "daily": {k: v for k, v in r["daily"].items()
                       if in_window(datetime.strptime(k, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000, args)},
         }
+        if args.include_sessions:
+            sys.stderr.write("[WARN] --include-sessions：本次输出包含 session 级标识与时间戳，"
+                             "属敏感运维元数据，请勿公开分享。\n")
+            slim["sessions"] = [s for s in r["sessions"] if in_window(s["start"], args)]
         print(json.dumps(slim, ensure_ascii=False, indent=1))
     else:
         # 默认全开（含工具明细）

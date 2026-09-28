@@ -25,8 +25,8 @@ OpenClaw 用量与性能查询工具：读取本地 session JSONL（`state/agent
 
 ## 3. 核心决策（指挥官拍板）
 
-1. **不做成本维度**：各模型供应商定价不同，token 是通用主指标。脚本无成本列；
-   如需成本自行配置 `models.providers.*.cost` 后扩展。
+1. **不做成本估算**：脚本**不读取、不计算、不输出任何 cost 字段**（文档 / 报告 / JSON 口径完全一致）；
+   各模型供应商定价不同，token 是通用主指标；需要成本请按 token × 单价自行换算。
 2. **cron 每日日报为可选项**：工具支持 `--today --json`，挂定时任务由用户自行决定；
    README 与 SKILL 中均有说明。
 3. **只做第一层（数据底座）+ 第二层（轻量查询）**：砍掉可视化看板（claw-lens）与
@@ -56,8 +56,9 @@ thinking_level_change / custom（model-snapshot、openclaw:prompt-error）。
 5. 任务排行：按活跃耗时（排除用户思考间隔）
 6. 每日趋势：每日输入/输出 token、调用数
 
-CLI：`--today / --week / --all / --agent <name> / --by-tool / --skills / --json / --state <path>`；
-数据目录默认自动检测（Windows 小遥Claw 路径），可用 `OPENCLAW_STATE` 环境变量覆盖。
+CLI：`--today / --week / --all / --agent <name> / --by-tool / --skills / --by-session / --daily / --json / --include-sessions / --state <path>`。
+数据目录解析顺序：`--state` 参数 → `OPENCLAW_STATE` 环境变量 → 桌面版（小遥Claw）默认路径；**实际使用的目录打印在报告首部**。
+输出最小化：默认只输出聚合统计（不含会话内容原文、不含 session id）；`--include-sessions` 才输出 session 级明细（敏感运维元数据）。
 
 ## 6. 仓库结构
 
@@ -74,7 +75,13 @@ xiaoyaoclaw-usage-report/
 └── assets/readme/            # hero.svg / community-qr.png（发布资产）
 ```
 
-## 7. 已知限制
+## 7. 语言策略
+
+本技能**不对任何语言或地区设限**：报告与文档默认中文，用户用英文或其它语言提问则跟随；
+文档与示例中的中文属**示例与品牌双语素材**（`README.md` 中文主体 / `README.en.md` 英文版 / 头图中英双语），
+不构成使用限制；脚本内文案可按需替换为任意语言。
+
+## 8. 已知限制
 
 - 任务活跃耗时为近似值（可能含 heartbeat/后台事件）
 - 仅支持 JSONL version 3 会话
