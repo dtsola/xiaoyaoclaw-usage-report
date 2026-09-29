@@ -45,6 +45,7 @@ thinking_level_change / custom（model-snapshot、openclaw:prompt-error）。
 | 任务窗口耗时 | session 首条用户消息 → 末条消息 | 含用户思考间隔 |
 | 任务活跃耗时 | 相邻事件间隔 <5min 累计 | 近似值，可能含 heartbeat |
 | skills 使用 | read 工具 arguments.file_path 含 /skills/<name>/SKILL.md | 仅统计被 read 加载过的技能 |
+| 时间窗 | 窗口 = **硬边界**：所有指标只聚合窗口内事件（默认窗口 = 今天） | ⚠️ 窗口外历史数据不参与任何聚合；全历史须显式 `--all` |
 | MCP 工具 | 与普通工具同构（toolCall/toolResult） | 天然覆盖 |
 
 ## 5. 输出维度
@@ -56,7 +57,8 @@ thinking_level_change / custom（model-snapshot、openclaw:prompt-error）。
 5. 任务排行：按活跃耗时（排除用户思考间隔）
 6. 每日趋势：每日输入/输出 token、调用数
 
-CLI：`--today / --week / --all / --agent <name> / --by-tool / --skills / --by-session / --daily / --json / --include-sessions / --state <path>`。
+CLI：`--today / --week / --all / --agent <name> / --by-tool / --skills / --by-session / --daily / --json / --include-sessions / --include-paths / --state <path>`。
+时间窗：**窗口即硬边界**——不传 `--today/--week/--all` 时默认「今天」（不扫全历史）；选定窗口后所有维度只统计窗口内事件，跨窗口长会话按窗口内部分截断；三者互斥。
 数据目录解析顺序：`--state` 参数 → `OPENCLAW_STATE` 环境变量（唯一读取的环境变量）→ 桌面版（小遥Claw）默认路径；报告首部打印实际使用的目录，**默认脱敏为末两级**（`--include-paths` 才显示完整路径）。
 输出最小化：默认只输出聚合统计（不含会话内容原文、不含 session id、不含本机绝对路径）；`--include-sessions` 才输出 session 级明细（字段：agent/id/start/end/duration_ms/active_ms/model_ms/models/tokens/tools/msgs），`--include-paths` 才输出完整本机路径。
 

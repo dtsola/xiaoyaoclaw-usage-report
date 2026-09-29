@@ -136,6 +136,7 @@ Want a daily report pushed automatically? Tell your agent:
 - **Read-only**: parses local session JSONL (`state/agents/*/sessions/*.jsonl`) only — **no file is modified, deleted or written**
 - **Zero network**: the script reads local files with the Python standard library only — **no network calls, no external services, no uploads** (GitHub / website links in these docs are human-readable references and are not used at runtime)
 - **Minimized output**: reports and JSON contain **aggregated statistics only** by default (counts / duration / tokens / tools / models / skill names) — **no conversation content, no session IDs, no absolute local paths** (the data directory is redacted to its last two segments, e.g. `…/openclaw/state`)
+- **The time window is a hard boundary**: once a window is selected (`--today` / `--week`; with no flag the default is **today**), **every** dimension (agent/model, tools, skills, daily trend, tasks) aggregates **in-window events only** — out-of-window history is never aggregated and never appears in the output (a long session spanning the boundary is truncated to its in-window part). Full history requires the explicit `--all` flag.
 - **Explicit opt-ins**: `--include-sessions` adds session-level fields (`agent` / `id` / `start` / `end` / `duration_ms` / `active_ms` / `model_ms` / `models` / `tokens` / `tools` / `msgs`); `--include-paths` reveals the full local path. Both print a sensitive-metadata warning — **do not share publicly**
 - **No cost estimation**: the script reads, computes and outputs no cost fields at all (docs, report and JSON are consistent)
 - **Data directory**: resolution order = `--state` argument → `OPENCLAW_STATE` env var (the only environment variable read) → desktop build default; the directory actually used is printed at the top of the report, redacted to its last two segments by default
@@ -148,6 +149,7 @@ Want a daily report pushed automatically? Tell your agent:
 3. **Model latency is an estimate** (assistant event ts − previous event ts, capped at 10 min). ⚠️ Do not use `message.timestamp` (batch-write timestamp); exact duration lives only in the diagnostics-otel event layer.
 4. **No cost estimation**: the script reads, computes and outputs **no cost fields** (docs, report and JSON are fully consistent); pricing differs per provider, so tokens are the universal metric. For costs, convert tokens × your own unit price.
 5. **Skill stats** cover only skills actually loaded via `read` (metadata-injected but never loaded ones are not counted).
+6. **Time window = hard boundary**: all aggregation runs on in-window events; with no window flag the default is **today** (never a full-history scan), and full history requires the explicit `--all` flag.
 
 ## Cron daily report (optional, user-configured)
 

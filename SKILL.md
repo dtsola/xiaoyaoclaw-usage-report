@@ -8,8 +8,11 @@ description: >
   token is the primary metric). Read-only: never modifies any file. Outputs
   are aggregated statistics only: no conversation content, no session
   identifiers (session-level detail is opt-in via --include-sessions) and no
-  credential fields. Documentation, report and JSON output follow the same
-  scope; links in the docs are human-readable references, the runtime script
+  credential fields. The time window is a hard boundary: with a window
+  selected (or the default "today") every dimension aggregates in-window
+  events only, and full history requires the explicit --all flag.
+  Documentation, report and JSON output follow the same scope; links in the
+  docs are human-readable references, the runtime script
   makes no network calls. Report text defaults to Chinese and can be adapted
   to the user's language; the skill imposes no language or region restriction.
   Use when the user asks about token usage, task duration, slowest tools,
@@ -60,6 +63,7 @@ permissions:
 - 本技能**不会自动运行**，也不做后台/定时扫描；只有当用户在当前对话里明确提出「用量 / 性能 / 耗时 / token」类查询时才执行
 - 单说的「报告」「统计」「今日数据」等泛指词**不算明确请求**——先反问用户是否指用量报告，不要直接全量扫描所有 agent 的 session
 - 扫描范围默认「用户指定的时间窗」；用户没指定时用 `--today`，不要默认跑 `--all`（全历史扫描请先确认）
+- **时间窗是硬边界**：脚本对**所有维度**都只统计窗口内事件（不含窗口外历史数据）；默认时间窗 = 今天；`--all`（全历史）必须显式传参且先向用户确认
 - 创建 cron / HEARTBEAT 定时任务**必须由用户显式要求并确认**（见下），本技能不主动建任务
 
 ### 2. Cron 定时（可选项，**须用户显式要求并确认**）
@@ -114,6 +118,9 @@ Cron 模式：只读查询 + 汇报结果，不写入任何文件。
 python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 ```
 
+> ⏱️ **时间窗 = 硬边界**：不给 `--today` / `--week` / `--all` 时默认按**今天**统计（不会扫全历史）；
+> 选定窗口后所有维度只统计窗口内事件，窗口外历史数据不参与任何聚合。
+
 输出维度：
 1. 总览：任务数、总 token(input+output)、总耗时
 2. 按 agent/模型：调用次数、输入/输出 token、模型总耗时/平均（近似）
@@ -129,7 +136,7 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 | 用户问 | 命令 |
 |---|---|
 | 「近 7 天」 | `--week` |
-| 「全部历史」 | `--all` |
+| 「全部历史」 | `--all`（**显式传参**；窗口外数据默认不进任何聚合） |
 | 「某某 agent 花了多少」 | `--agent <name>` |
 | 「哪个工具最慢」 | `--by-tool` |
 | 「用了哪些技能」 | `--skills` |
@@ -149,6 +156,7 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 - **模型耗时 = 近似估算**（事件顶层 ts 间隔，cap 10min；⚠️ 不能用 message.timestamp，那是批量写入时间戳；精确值在 OpenClaw diagnostics-otel 事件层）
 - **不做成本估算**：脚本**不读取、不计算、不输出任何 cost 字段**（文档 / 报告 / JSON 口径完全一致）；各供应商定价不同且随时变动，token 才是通用主指标；用户需要成本时，引导其按 token × 单价自行换算
 - **skills 仅统计被 read 加载过的**（metadata 注入未加载的不计）
+- **时间窗 = 硬边界**：所有聚合都只基于**窗口内**事件（agent/模型、工具、技能、每日趋势、任务一律如此）；不指定时默认「今天」，不会扫全历史；`--all` 只统计全历史且必须显式传参；跨窗口的长会话按窗口内部分截断
 
 ## 安全红线
 
@@ -161,6 +169,7 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 7. **cron 日报由用户决定**：不主动创建定时任务，用户明确要求并确认后才提供/添加配置
 8. **输出最小化**：默认只输出聚合统计（次数/耗时/token/工具/模型/技能名）——**不含会话内容原文、不含 session id、不含本机绝对路径**（路径默认脱敏为末两级，完整路径需 `--include-paths`）；JSON 的 session 级明细须显式 `--include-sessions`，属敏感运维元数据，须提醒用户勿公开分享
 9. **零网络**：运行时脚本只用 Python 标准库读本地文件，无网络请求、无外部服务调用；文档中的 GitHub / 官网链接仅供人类阅读，不参与技能运行
+10. **时间窗不越界**：选定时间窗后，脚本**不读取窗口外的数据去参与统计**——遍历到窗口外事件即丢弃，不进入任何聚合、也不出现在输出（默认时间窗 = 今天；`--all` 须显式传参）
 
 ## 完整示例
 
@@ -185,8 +194,11 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 | 网络 | **无**——不使用任何网络能力 |
 | 环境变量 | 仅 `OPENCLAW_STATE`（可选；未指定 `--state` 时用于定位数据目录），不读取其他环境变量 |
 | 配置文件 | **不读不写** `openclaw.json` 等任何配置文件 |
+| 时间窗 | **硬边界**——按所选窗口（`--today` / `--week`，默认「今天」）过滤事件；窗口外数据不参与任何聚合，全历史须显式 `--all` |
 
 **默认输出字段**（脱敏口径）：时间范围、数据目录（脱敏末两级）、agent 过滤、任务数；按 agent/模型：调用次数 + 输入/输出 token + 模型耗时；按工具：次数/失败/总耗时/平均/最慢；skills：技能名/读取次数/agent；任务排行：agent/活跃耗时/窗口耗时/模型耗时/token/消息数/模型名；每日趋势：日期/输入输出 token/调用数。**不含**会话内容原文、session id、本机绝对路径。
+
+**所有字段都只统计所选时间窗内的事件**（窗口即边界）；JSON 的 `meta.window` / `meta.window_scoped` / `meta.window_start` / `meta.window_end` 声明本次输出的窗口（`--all` 时 start/end 为 `null`）。
 
 **`--include-sessions` 追加字段**（显式开启，输出前会打印敏感告警）：`agent` / `id`（session id）/ `start` / `end` / `duration_ms` / `active_ms` / `model_ms` / `models` / `tokens` / `tools` / `msgs`。
 

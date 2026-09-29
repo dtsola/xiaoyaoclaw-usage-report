@@ -136,6 +136,7 @@ agent 完成：定位 usage-report 技能 → 解析 state 目录下的 session 
 - **只读**：仅解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**不修改、不删除、不写入任何文件**
 - **零网络**：脚本只用 Python 标准库读本地文件，**无网络请求、无外部服务、无上传**（文中的 GitHub / 官网链接仅供人类阅读，不参与技能运行）
 - **输出最小化**：报告与 JSON 默认**只含聚合统计**（次数 / 耗时 / token / 工具 / 模型 / 技能名）——**不含会话内容原文、不含 session id、不含本机绝对路径**（数据目录默认脱敏为末两级，如 `…/openclaw/state`）
+- **时间窗是硬边界**：选定时间窗（`--today` / `--week`，**不给参数时默认「今天」**）后，**所有维度**（agent/模型、工具、技能、每日趋势、任务）都只统计窗口内的事件——**窗口外的历史数据不参与任何聚合、不出现在输出中**（跨窗口的长会话按窗口内部分截断）。需要全历史必须显式 `--all`
 - **显式开启的例外**：`--include-sessions` 追加 session 级字段（`agent` / `id` / `start` / `end` / `duration_ms` / `active_ms` / `model_ms` / `models` / `tokens` / `tools` / `msgs`）；`--include-paths` 显示完整本机路径。两者均会打印敏感告警，**请勿公开分享**
 - **不做成本估算**：脚本不读取、不计算、不输出任何 cost 字段（文档、报告、JSON 三处口径一致）
 - **数据目录**：解析顺序 = `--state` 参数 → `OPENCLAW_STATE` 环境变量（本工具**唯一读取的环境变量**）→ 桌面版默认路径；报告首部打印实际使用的目录，默认脱敏为末两级
@@ -148,6 +149,7 @@ agent 完成：定位 usage-report 技能 → 解析 state 目录下的 session 
 3. **模型耗时为近似估算**（assistant 事件 ts − 前一条事件 ts，cap 10min）。⚠️ 不能用 message.timestamp（批量写入时间戳）；精确 duration 仅在 OpenClaw diagnostics-otel 事件层。
 4. **不做成本估算**：脚本**不读取、不计算、不输出任何 cost 字段**（文档 / 报告 / JSON 口径完全一致）；各模型供应商定价不同，token 是通用主指标；需要成本请按 token × 单价自行换算。
 5. **skills 统计**：仅覆盖「被 read 加载过」的技能（metadata 注入未加载的不计）。
+6. **时间窗 = 硬边界**：所有聚合都只基于窗口内事件；不指定时间窗时默认「今天」，**不会**扫全历史；需要全历史请显式 `--all`。
 
 ## Cron 每日日报（可选项，用户自行设置）
 
