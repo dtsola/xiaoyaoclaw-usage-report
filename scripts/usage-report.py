@@ -522,7 +522,9 @@ def main():
     ap.add_argument("--agent", default=None, help="按 agent 过滤")
     ap.add_argument("--by-tool", action="store_true", help="工具耗时明细")
     ap.add_argument("--skills", action="store_true", help="skills 使用统计")
-    ap.add_argument("--by-session", action="store_true", help="任务耗时排行")
+    # 任务级明细（每条任务的 agent / 耗时 / token / 模型）只有一个开关：--include-sessions。
+    # 曾经存在的 --by-session 会被它绕过隐私门，已移除——任务明细 = session 级元数据，
+    # 必须由 --include-sessions 显式开启。
     ap.add_argument("--by-model-time", action="store_true", help="任务排行按模型耗时排序")
     ap.add_argument("--daily", action="store_true", help="每日趋势")
     ap.add_argument("--json", action="store_true", help="JSON 输出（默认仅聚合统计）")
@@ -592,9 +594,12 @@ def main():
         args.by_tool = args.by_tool or True
         args.skills = args.skills or True
         # 任务级明细（每条任务的 agent / 耗时 / token / 模型）属 session 级元数据，
-        # 与 JSON 路径口径一致：**必须显式 --include-sessions 才输出**
-        args.by_session = args.by_session or args.include_sessions
+        # 与 JSON 路径口径一致：**唯一开关是 --include-sessions**，没有旁路
+        args.by_session = bool(args.include_sessions)
         args.daily = args.daily or True
+        if args.by_session:
+            sys.stderr.write("[WARN] --include-sessions：本次输出包含任务级明细"
+                             "（agent / 耗时 / token / 模型），属敏感运维元数据，请勿公开分享。\n")
         print(report(r, args))
 
 
