@@ -28,6 +28,7 @@ allowed-tools:
   - Read
   - Glob
   - Bash
+  - Env
 permissions:
   read:
     - OpenClaw state 目录下的 session JSONL：agents/*/sessions/*.jsonl（只读，仅聚合统计）
