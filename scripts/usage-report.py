@@ -140,7 +140,8 @@ def analyze(state_dir, args):
 
     files = find_session_files(state_dir)
     if not files:
-        print(f"[WARN] 未找到 session 文件: {state_dir}")
+        # 告警里也只给脱敏路径，避免在可分享的输出里泄露本机绝对路径
+        print(f"[WARN] 未找到 session 文件: {redact_path(state_dir)}")
         return None
 
     # 时间窗过滤器：窗口外的事件不进入任何聚合（agent/模型、工具、技能、每日趋势、任务）
