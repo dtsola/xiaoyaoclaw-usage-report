@@ -71,7 +71,7 @@ python scripts/usage-report.py --all      # 全部
 python scripts/usage-report.py --agent xiaoxia   # 按 agent 过滤
 python scripts/usage-report.py --by-tool  # 仅工具耗时
 python scripts/usage-report.py --skills   # 仅技能使用
-python scripts/usage-report.py --today --json > usage-report.json   # JSON（默认仅聚合统计）
+python scripts/usage-report.py --today --json   # JSON（默认仅聚合统计；脚本只写 stdout，落盘由你自己决定）
 python scripts/usage-report.py --today --json --include-sessions    # 追加 session 级明细（含标识/时间戳，勿公开分享）
 python scripts/usage-report.py --today --include-paths              # 显示完整数据目录路径（默认脱敏）
 ```

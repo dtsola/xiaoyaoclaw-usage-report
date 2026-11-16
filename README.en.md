@@ -69,7 +69,7 @@ python scripts/usage-report.py --all      # all history
 python scripts/usage-report.py --agent xiaoxia   # filter by agent
 python scripts/usage-report.py --by-tool  # tool latency only
 python scripts/usage-report.py --skills   # skills only
-python scripts/usage-report.py --today --json > usage-report.json   # JSON (aggregated stats only)
+python scripts/usage-report.py --today --json   # JSON (aggregated stats only; the script writes to stdout only — saving it is your call)
 python scripts/usage-report.py --today --json --include-sessions    # add session-level detail (IDs/timestamps - do not share publicly)
 python scripts/usage-report.py --today --include-paths              # show the full data directory path (redacted by default)
 ```

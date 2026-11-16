@@ -126,8 +126,13 @@ def analyze(state_dir, args):
                                                       "calls": 0,
                                                       "total_ms": 0, "max_ms": 0}))
     tools = defaultdict(lambda: {"count": 0, "errors": 0, "total_ms": 0,
-                                 "max_ms": 0, "min_ms": None, "agents": set()})
-    skills = defaultdict(lambda: {"count": 0, "agents": set()})
+                                 "max_ms": 0, "min_ms": None, "agents": set(),
+                                 # per_agent：按 agent 拆分的计数，供 --agent 过滤时重新计算，
+                                 # 避免把「别的 agent 也在用」的工具/技能的合并计数暴露出去
+                                 "per_agent": defaultdict(lambda: {"count": 0, "errors": 0,
+                                                                 "total_ms": 0, "max_ms": 0})})
+    skills = defaultdict(lambda: {"count": 0, "agents": set(),
+                                  "per_agent": defaultdict(lambda: {"count": 0})})
     sessions = []  # (agent, session_id, start, end, models, tokens, tools, msgs)
     daily = defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0, "calls": 0,
                                  "agents": defaultdict(lambda: {"tokens_in": 0, "tokens_out": 0,
@@ -185,7 +190,9 @@ def analyze(state_dir, args):
             elif etype == "message":
                 msg = ev.get("message") or {}
                 role = msg.get("role")
-                mts = parse_ts(msg.get("timestamp")) or ts
+                # 时间基准只用**事件 ts**（已按窗口裁剪）：message.timestamp 可能是批量写入时间，
+                # 落在窗口外，会让每日趋势 / 任务耗时越出所选时间窗
+                mts = ts or parse_ts(msg.get("timestamp"))
                 if mts:
                     if s_start is None or mts < s_start:
                         s_start = mts
@@ -242,7 +249,7 @@ def analyze(state_dir, args):
                     tid = ev.get("toolCallId") or msg.get("toolCallId")
                     tname = msg.get("toolName") or "?"
                     is_err = bool(msg.get("isError"))
-                    rts = parse_ts(msg.get("timestamp")) or mts
+                    rts = ts or mts   # 同上：只用窗口内的事件时间，避免跨窗耗时
                     s_tools.add(tname)
                     if tid in pend_calls:
                         pname, pts = pend_calls.pop(tid)
@@ -252,14 +259,22 @@ def analyze(state_dir, args):
                         tools[pname]["max_ms"] = max(tools[pname]["max_ms"], dur)
                         tools[pname]["min_ms"] = dur if tools[pname]["min_ms"] is None else min(tools[pname]["min_ms"], dur)
                         tools[pname]["agents"].add(agent)
+                        pa = tools[pname]["per_agent"][agent]
+                        pa["count"] += 1
+                        pa["total_ms"] += dur
+                        pa["max_ms"] = max(pa["max_ms"], dur)
                         if is_err:
                             tools[pname]["errors"] += 1
+                            pa["errors"] += 1
                     else:
                         # 无配对（如截断）也计数
                         tools[tname]["count"] += 1
                         tools[tname]["agents"].add(agent)
+                        pa = tools[tname]["per_agent"][agent]
+                        pa["count"] += 1
                         if is_err:
                             tools[tname]["errors"] += 1
+                            pa["errors"] += 1
 
                 # 任务耗时窗口：只要 session 有消息就累计
             elif etype == "custom" and ev.get("customType") == "model-snapshot":
@@ -278,6 +293,7 @@ def analyze(state_dir, args):
                         if sk:
                             skills[sk]["count"] += 1
                             skills[sk]["agents"].add(agent)
+                            skills[sk]["per_agent"][agent] += 1
 
         if session_id and s_msgs > 0:
             # 起止时间为**窗口内**首末消息（跨窗口长会话按窗口截断），
@@ -317,13 +333,34 @@ def fmt_ms(ms):
 
 def apply_agent_filter(r, agent_name):
     """按 agent 过滤所有维度（agents/tools/skills/sessions/daily）。
-    必须在窗口过滤之前、输出之前调用，保证 --agent 对每个维度都生效。"""
+    必须在窗口过滤之前、输出之前调用，保证 --agent 对每个维度都生效。
+
+    工具 / 技能维度是**跨 agent 合并**的计数。只把「别的 agent 也在用」的行删掉是不够的
+    ——那仍会把别人的次数、耗时和名字一起暴露出去。因此这里按 per_agent 明细
+    **重新计算**该 agent 自己的数值，并把 agents 集合收敛为该 agent。"""
     if not agent_name:
         return r
     r = dict(r)
     r["agents"] = {a: mm for a, mm in r["agents"].items() if a == agent_name}
-    r["tools"] = {t: d for t, d in r["tools"].items() if agent_name in d["agents"]}
-    r["skills"] = {s: d for s, d in r["skills"].items() if agent_name in d["agents"]}
+
+    tools = {}
+    for t, d in r["tools"].items():
+        pa = (d.get("per_agent") or {}).get(agent_name)
+        if not pa:
+            continue
+        tools[t] = {"count": pa["count"], "errors": pa["errors"],
+                    "total_ms": pa["total_ms"], "max_ms": pa["max_ms"],
+                    "min_ms": None, "agents": {agent_name}}
+    r["tools"] = tools
+
+    skills = {}
+    for s, d in r["skills"].items():
+        c = (d.get("per_agent") or {}).get(agent_name)
+        if not c:
+            continue
+        skills[s] = {"count": c, "agents": {agent_name}}
+    r["skills"] = skills
+
     r["sessions"] = [s for s in r["sessions"] if s["agent"] == agent_name]
     # daily：只保留该 agent 的每日数据（无数据的天剔除）
     r["daily"] = {k: v for k, v in r["daily"].items() if agent_name in v["agents"]}
@@ -393,7 +430,7 @@ def report(r, args):
     out.append("=" * 60)
     out.append("OpenClaw 用量报告")
     out.append(f"时间范围: {window_label(args)} | "
-               f"agent 过滤: {args.agent or '全部'} | sessions: {len(sess)}")
+               f"agent 过滤: {args.agent or '全部'} | 会话数(仅计数): {len(sess)}")
     out.append("统计边界: 所有维度（agent/模型、工具、技能、每日趋势、任务）只统计该时间窗内的"
                "事件；窗口外的历史数据不参与任何聚合、不出现在输出中（跨窗口长会话按窗口内部分截断）"
                "。默认时间窗 = 今天；全历史需显式 --all")
@@ -401,16 +438,18 @@ def report(r, args):
     out.append(f"数据源: {shown} （只读解析 agents/*/sessions/*.jsonl）"
                + ("" if args.include_paths else "；完整路径用 --include-paths"))
     out.append("输出范围: 仅聚合统计（次数/耗时/token/工具/模型/技能名）"
-               "——不含会话内容原文、不含 session id")
+               "——不含会话内容原文、不含 session id；逐会话明细需显式 --include-sessions")
     out.append("=" * 60)
 
-    # 1. 汇总
-    tot_in = sum(s["tokens"] for s in sess)  # 简化：sessions 聚合
-    tot_ms = sum(s["duration_ms"] for s in sess)
-    out.append(f"\n📊 总览: {len(sess)} 个任务 | 总 token(input+output): {tot_in:,} | "
-               f"总耗时: {fmt_ms(tot_ms)}")
-    out.append("  (任务耗时 = session 首条用户消息 → 末条消息，含用户思考间隔；"
-               "本技能不做成本估算——脚本不读取、不计算、不输出任何 cost 字段，token 为通用主指标)")
+    # 1. 汇总（**事件级聚合**：直接从 agent/模型维度汇总，不用 session 对象，
+    #    保证默认输出里不出现任何「按会话」口径的指标）
+    tot_in = sum(d["tokens_in"] for mm in r["agents"].values() for d in mm.values())
+    tot_out = sum(d["tokens_out"] for mm in r["agents"].values() for d in mm.values())
+    tot_calls = sum(d["calls"] for mm in r["agents"].values() for d in mm.values())
+    out.append(f"\n📊 总览: {tot_calls:,} 次模型调用 | 总 token(input+output): {tot_in + tot_out:,}"
+               f"（输入 {tot_in:,} / 输出 {tot_out:,}）")
+    out.append(f"  会话数: {len(sess)}（仅计数；逐会话耗时/token/模型明细需显式 --include-sessions）")
+    out.append("  (本技能不做成本估算——脚本不读取、不计算、不输出任何 cost 字段，token 为通用主指标)")
 
     # 2. 按 agent + 模型
     out.append("\n📦 按 agent / 模型（token=input+output 真实消耗；模型耗时≈本消息ts−前事件ts，cap 10min）:")
@@ -533,8 +572,13 @@ def main():
                         "也不含本机绝对路径",
             },
             "agents": {a: {m: d for m, d in mm.items()} for a, mm in r["agents"].items()},
-            "tools": {t: {**d, "agents": sorted(d["agents"])} for t, d in r["tools"].items()},
-            "skills": {k: {"count": v["count"], "agents": sorted(v["agents"])} for k, v in r["skills"].items()},
+            # 逐字段输出：per_agent 明细不对外（会让 --agent 之外的使用者看到别人的分项）
+            "tools": {t: {"count": d["count"], "errors": d["errors"],
+                          "total_ms": d["total_ms"], "max_ms": d["max_ms"],
+                          "min_ms": d.get("min_ms"), "agents": sorted(d["agents"])}
+                      for t, d in r["tools"].items()},
+            "skills": {k: {"count": v["count"], "agents": sorted(v["agents"])}
+                       for k, v in r["skills"].items()},
             "daily": r["daily"],
         }
         if args.include_sessions:
@@ -546,7 +590,9 @@ def main():
         # 默认全开（含工具明细）
         args.by_tool = args.by_tool or True
         args.skills = args.skills or True
-        args.by_session = args.by_session or True
+        # 任务级明细（每条任务的 agent / 耗时 / token / 模型）属 session 级元数据，
+        # 与 JSON 路径口径一致：**必须显式 --include-sessions 才输出**
+        args.by_session = args.by_session or args.include_sessions
         args.daily = args.daily or True
         print(report(r, args))
 

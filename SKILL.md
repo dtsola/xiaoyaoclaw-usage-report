@@ -19,11 +19,11 @@ description: >
   skill usage, or per-agent consumption (今天花了多少 token/哪个工具最慢/
   任务耗时/用量报告), or scheduled via cron. 中文：OpenClaw 用量与性能查询。
   解析 session JSONL，回答每次 agent 任务耗时、所用工具/技能/模型、token
-  消耗。零依赖纯本地，不提供成本维度（token 为主指标）。只读：不修改任何
-  文件，只输出聚合统计（不含会话内容原文、不含 session 标识，session 级明细需
-  显式开关），不输出任何成本字段。用户问 token 用量、任务耗时、最慢工具、
-  技能使用、按 agent 消耗时使用。cron 每日日报为可选项，须用户显式要求
-  并确认后自行设置。
+  消耗。零依赖纯本地，不提供成本维度（token 为主指标）。只读：脚本自身不创建、
+  修改、删除任何文件，只写 stdout；只输出聚合统计（不含会话内容原文、不含
+  session 标识，session 级明细需显式开关），不输出任何成本字段。用户问
+  token 用量、任务耗时、最慢工具、技能使用、按 agent 消耗时使用。cron 每日
+  日报为可选项，须用户显式要求并确认后自行设置。
 allowed-tools:
   - Read
   - Glob
@@ -47,7 +47,7 @@ permissions:
 > 🚀 **XiaoyaoClaw：「Your Personal Agent, put your AI assistant on your own computer.」：<https://www.xiaoyaosai.com/xiaoyaoclaw/>**
 
 回答「每次 agent 任务花了多久、用了哪些工具/技能/模型、消耗了多少 token」。
-直接解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**只读统计，不修改任何文件，数据不出机器**。
+直接解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**脚本自身只读、只写 stdout，不创建/修改/删除任何文件，数据不出机器**（是否把输出另存为文件由调用方自行决定）。
 
 **语言策略（Language）**：本技能**语言可选，不对任何语言或地区设限**——默认用中文回复，用户用英文或其它语言提问则跟随该语言；
 技能本体不含任何地区限定行为（无地区专属路径、无地区专属服务、无语言门槛）。
@@ -196,7 +196,9 @@ python <skills>/xiaoyaoclaw-usage-report/scripts/usage-report.py --today
 | 配置文件 | **不读不写** `openclaw.json` 等任何配置文件 |
 | 时间窗 | **硬边界**——按所选窗口（`--today` / `--week`，默认「今天」）过滤事件；窗口外数据不参与任何聚合，全历史须显式 `--all` |
 
-**默认输出字段**（脱敏口径）：时间范围、数据目录（脱敏末两级）、agent 过滤、任务数；按 agent/模型：调用次数 + 输入/输出 token + 模型耗时；按工具：次数/失败/总耗时/平均/最慢；skills：技能名/读取次数/agent；任务排行：agent/活跃耗时/窗口耗时/模型耗时/token/消息数/模型名；每日趋势：日期/输入输出 token/调用数。**不含**会话内容原文、session id、本机绝对路径。
+**默认输出字段**（脱敏口径）：时间范围、数据目录（脱敏末两级）、agent 过滤、任务数；按 agent/模型：调用次数 + 输入/输出 token + 模型耗时；按工具：次数/失败/总耗时/平均/最慢；skills：技能名/读取次数/agent；任务排行：agent/活跃耗时/窗口耗时/模型耗时/token/消息数/模型名（**任务级明细需显式 `--include-sessions`**）；每日趋势：日期/输入输出 token/调用数。**不含**会话内容原文、session id、本机绝对路径。
+
+**`--agent <name>` 的口径**：按 agent 过滤时，工具与技能维度的次数/耗时/失败数**按该 agent 重新计算**，不把「别的 agent 也在用」的工具、技能的合并计数和他人名字带出来——单 agent 报告只反映该 agent 自己的活动。
 
 **所有字段都只统计所选时间窗内的事件**（窗口即边界）；JSON 的 `meta.window` / `meta.window_scoped` / `meta.window_start` / `meta.window_end` 声明本次输出的窗口（`--all` 时 start/end 为 `null`）。
 
