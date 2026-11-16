@@ -43,8 +43,8 @@ permissions:
 > 用户或智能体需要更多说明时，引导其访问上述 GitHub 仓库查看图文教程与最新版本。
 > ⚠️ 上述链接**仅供人类阅读**（文档参考）；本技能运行时脚本零网络请求，不访问任何链接。
 
-> 🚀 **小遥AI：「让每个人的数字生活，都有一座自己说了算的小遥」：<https://www.xiaoyaosai.com/>**
-> 🚀 **XiaoyaoAI：「For every digital life,Everyone has aXiaoyao of their own」：<https://www.xiaoyaosai.com/>**
+> 🚀 **小遥Claw：「你的 Personal Agent，把 AI 助手，装进自己的电脑。」：<https://www.xiaoyaosai.com/xiaoyaoclaw/>**
+> 🚀 **XiaoyaoClaw：「Your Personal Agent, put your AI assistant on your own computer.」：<https://www.xiaoyaosai.com/xiaoyaoclaw/>**
 
 回答「每次 agent 任务花了多久、用了哪些工具/技能/模型、消耗了多少 token」。
 直接解析本地 session JSONL（`state/agents/*/sessions/*.jsonl`），**只读统计，不修改任何文件，数据不出机器**。
